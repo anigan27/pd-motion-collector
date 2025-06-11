@@ -129,6 +129,20 @@ struct ContentView: View {
                         .cornerRadius(14)
                         .transition(.opacity)
                         .zIndex(1)
+                    
+                
+                }
+                
+                if motionManager.showSentPopup {
+                    Text("Sent!")
+                        .font(.headline)
+                        .padding(.vertical, 10)
+                        .padding(.horizontal, 20)
+                        .background(Color.gray.opacity(0.9))
+                        .foregroundColor(.white)
+                        .cornerRadius(14)
+                        .transition(.opacity)
+                        .zIndex(1)
                 }
             }
             .padding()
