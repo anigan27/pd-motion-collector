@@ -19,6 +19,11 @@ struct ContentView: View {
     @State private var fileAlertMessage = ""
     @State private var showDeleteAlert = false
     @State private var fileToDelete: MotionFile?
+    @State private var isSelecting = false
+    @State private var selectedIDs = Set<UUID>()
+    @State private var showShareSheet = false
+    @State private var filesToShare: [URL] = []
+    @State private var showBatchDeleteAlert = false
     
     var body: some View {
         NavigationView {
@@ -34,64 +39,152 @@ struct ContentView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.top, 8)
                         .padding(.leading, 14)
+                    
                     List {
+                        HStack {
+                            if isSelecting {
+                                Button("Done") {
+                                    isSelecting = false
+                                    selectedIDs.removeAll()
+                                }
+                                .buttonStyle(.borderless)
+                                .padding(.leading, 14)
+                            } else {
+                                Button("Select") {
+                                    isSelecting = true
+                                }
+                                .buttonStyle(.borderless)
+                                .padding(.leading, 14)
+                            }
+                            Spacer()
+                        }
                         ForEach(sessionManager.files) { file in
                             HStack {
+                                // Show checkmark button only in selection mode
+                                if isSelecting {
+                                    Button(action: {
+                                        if selectedIDs.contains(file.id) {
+                                            selectedIDs.remove(file.id)
+                                        } else {
+                                            selectedIDs.insert(file.id)
+                                        }
+                                    }) {
+                                        Image(systemName: selectedIDs.contains(file.id) ? "checkmark.circle.fill" : "circle")
+                                            .foregroundColor(.blue)
+                                    }
+                                    .buttonStyle(.borderless)
+                                }
+
                                 Text(file.name)
                                 Spacer()
-                                Button("View") {
-                                    let path = file.url.path
-                                    let exists = FileManager.default.fileExists(atPath: path)
-                                    if exists {
-                                        do {
-                                            let data = try Data(contentsOf: file.url)
-                                            if data.count > 0 {
-                                                // Add a slight delay to ensure file is ready and avoid blank screen bug
-                                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                                                    previewURL = IdentifiablePreviewURL(url: file.url)
+
+                                // Existing buttons only visible when NOT selecting
+                                if !isSelecting {
+                                    Button("View") {
+                                        let path = file.url.path
+                                        let exists = FileManager.default.fileExists(atPath: path)
+                                        if exists {
+                                            do {
+                                                let data = try Data(contentsOf: file.url)
+                                                if data.count > 0 {
+                                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                                                        previewURL = IdentifiablePreviewURL(url: file.url)
+                                                    }
+                                                } else {
+                                                    fileAlertMessage = "File is empty!"
+                                                    showFileMissingAlert = true
                                                 }
-                                            } else {
-                                                fileAlertMessage = "File is empty!"
+                                            } catch {
+                                                fileAlertMessage = "Error reading file: \(error)"
                                                 showFileMissingAlert = true
                                             }
-                                        } catch {
-                                            fileAlertMessage = "Error reading file: \(error)"
+                                        } else {
+                                            fileAlertMessage = "File does not exist at \(path)"
                                             showFileMissingAlert = true
                                         }
+                                    }
+                                    .buttonStyle(.borderless)
+
+                                    Button("Rename") {
+                                        renamingFile = file
+                                        newName = file.name.replacingOccurrences(of: ".csv", with: "")
+                                        showRenameAlert = true
+                                    }
+                                    .buttonStyle(.borderless)
+                                    .foregroundColor(.green)
+
+                                    Button(action: {
+                                        fileToDelete = file
+                                        showDeleteAlert = true
+                                    }) {
+                                        Text("Delete")
+                                            .foregroundColor(.red)
+                                    }
+                                    .buttonStyle(.borderless)
+                                    .accessibilityLabel("Delete file")
+                                }
+                            }
+                            .contentShape(Rectangle()) // make entire row tappable
+                            .onTapGesture {
+                                if isSelecting {
+                                    if selectedIDs.contains(file.id) {
+                                        selectedIDs.remove(file.id)
                                     } else {
-                                        fileAlertMessage = "File does not exist at \(path)"
-                                        showFileMissingAlert = true
+                                        selectedIDs.insert(file.id)
                                     }
                                 }
-                                .buttonStyle(.borderless)
-                                
-                                
-                                
-                                Button("Rename") {
-                                    renamingFile = file
-                                    newName = file.name.replacingOccurrences(of: ".csv", with: "")
-                                    showRenameAlert = true
-                                }
-                                .buttonStyle(.borderless)
-                                .foregroundColor(.green)
-                                
-                                
-                                Button(action: {
-                                    fileToDelete = file
-                                    showDeleteAlert = true
-                                }) {
-                                    Text("Delete")
-                                        .foregroundColor(.red)
-                                    
-                                }
-                                .buttonStyle(.borderless)
-                                .accessibilityLabel("Delete file")
                             }
+
                         }
                     }
                     .frame(maxHeight: 300)
                 }
                 .navigationTitle("Motion Collector")
+                .toolbar {
+                    
+                    ToolbarItemGroup(placement: .navigationBarTrailing) {
+                        if isSelecting {
+                            Button {
+                                let urlsToShare = sessionManager.files.filter { selectedIDs.contains($0.id) }.map { $0.url }
+                                presentShareSheet(urls: urlsToShare)
+                            } label: {
+                                Image(systemName: "square.and.arrow.up")
+                            }
+                            .disabled(selectedIDs.isEmpty)
+
+
+
+
+
+
+
+                            Button(role: .destructive) {
+                                showBatchDeleteAlert = true
+                            } label: {
+                                Image(systemName: "trash")
+                            }
+                            .disabled(selectedIDs.isEmpty)
+                        }
+                    }
+                }
+
+                .alert("Delete Selected Files?", isPresented: $showBatchDeleteAlert) {
+                    Button("Delete", role: .destructive) {
+                        // Perform batch delete here
+                        for file in sessionManager.files.filter({ selectedIDs.contains($0.id) }) {
+                            sessionManager.delete(file: file)
+                        }
+                        selectedIDs.removeAll()
+                        isSelecting = false  // Optionally exit selection mode after deleting
+                    }
+                    Button("Cancel", role: .cancel) {
+                        // Just dismiss the alert
+                        showBatchDeleteAlert = false
+                    }
+                } message: {
+                    Text("Are you sure you want to delete the selected files?")
+                }
+
                 .alert("Rename File", isPresented: $showRenameAlert) {
                     TextField("New name", text: $newName)
                     Button("Cancel", role: .cancel) {}
@@ -107,6 +200,10 @@ struct ContentView: View {
                     Text(fileAlertMessage)
                 }
                 // Use .sheet(item:) with UINavigationController embedding
+               
+
+
+
                 .sheet(item: $previewURL, onDismiss: {
                     previewURL = nil
                 }) { identifiableURL in
@@ -176,4 +273,25 @@ struct ContentView: View {
             }
         }
     } 
+import UIKit
 
+func presentShareSheet(urls: [URL]) {
+    guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+          let rootVC = windowScene.windows.first?.rootViewController else {
+        return
+    }
+
+    let activityVC = UIActivityViewController(activityItems: urls, applicationActivities: nil)
+
+    // iPad popover fix
+    if let popover = activityVC.popoverPresentationController {
+        popover.sourceView = rootVC.view
+        popover.sourceRect = CGRect(x: rootVC.view.bounds.midX,
+                                    y: rootVC.view.bounds.midY,
+                                    width: 0,
+                                    height: 0)
+        popover.permittedArrowDirections = []
+    }
+
+    rootVC.present(activityVC, animated: true, completion: nil)
+}
