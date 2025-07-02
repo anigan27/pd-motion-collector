@@ -1,6 +1,7 @@
 import SwiftUI
 import QuickLook
 import UIKit
+import WatchConnectivity
 
 // Identifiable wrapper for URL to use with .sheet(item:)
 struct IdentifiablePreviewURL: Identifiable, Equatable {
@@ -24,11 +25,35 @@ struct ContentView: View {
     @State private var showShareSheet = false
     @State private var filesToShare: [URL] = []
     @State private var showBatchDeleteAlert = false
+    @State private var selectedTest: TestType = .fingerTapping
+
     
     var body: some View {
         NavigationView {
 
                 VStack(spacing: 20) {
+                    VStack {
+                        Picker("Select Test", selection: $selectedTest) {
+                            ForEach(TestType.allCases) { test in
+                                Text(test.rawValue).tag(test)
+                            }
+                        }
+                        .pickerStyle(MenuPickerStyle())
+                        .padding(.vertical)
+                        
+                       
+                    }
+                    .onChange(of: selectedTest) { newTest in
+                        if WCSession.default.isReachable {
+                            WCSession.default.sendMessage(
+                                ["testType": newTest.fileName, "needsTimer": newTest.needsTimer],
+                                replyHandler: nil,
+                                errorHandler: nil
+                            )
+                        }
+                    }
+
+
                     VStack(alignment: .leading, spacing: 4) {
                             Text("Welcome to Motion Collector!")
                                 .font(.title2).bold()

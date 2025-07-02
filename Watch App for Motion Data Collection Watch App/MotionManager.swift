@@ -40,6 +40,9 @@ class MotionManager: NSObject, ObservableObject, WCSessionDelegate {
     private var sampleRate: Double = 20
     private var latestRawAccel: CMAccelerometerData?
     @Published var showSentPopup = false
+    @Published var currentTestType: String = "finger_tapping"
+    @Published var useTimer: Bool = false
+    
     override init() {
         super.init()
         if WCSession.isSupported() {
@@ -57,19 +60,19 @@ class MotionManager: NSObject, ObservableObject, WCSessionDelegate {
             stopCollecting()
             WKInterfaceDevice.current().play(.stop)
         }
-         
+        
     }
     
     func startCollecting() {
         samples.removeAll()
         motionManager.accelerometerUpdateInterval = 1.0 / sampleRate
         motionManager.deviceMotionUpdateInterval = 1.0 / sampleRate
-
+        
         // Start raw accelerometer updates
         motionManager.startAccelerometerUpdates(to: .main) { [weak self] data, _ in
             self?.latestRawAccel = data
         }
-
+        
         // Start device motion updates
         motionManager.startDeviceMotionUpdates(to: .main) { [weak self] data, _ in
             guard let self = self, let dmData = data, let accelData = self.latestRawAccel else { return }
@@ -104,45 +107,16 @@ class MotionManager: NSObject, ObservableObject, WCSessionDelegate {
         motionManager.stopDeviceMotionUpdates()
     }
     
-//    func exportAndSendCSV() {
-////        let csvHeader = "timestamp,x,y,z\n"
-////        let csvBody = samples.map { "\($0.timestamp),\($0.x),\($0.y),\($0.z)"}.joined(separator: "\n")
-////        let csvString = csvHeader + csvBody
-//        let csvHeader = "time,x,y,z\r\n"
-//        let formatter = DateFormatter()
-//        formatter.dateFormat = "HH:mm:ss" // or "h:mm:ss a" for 12-hour
-//
-//        let csvBody = samples.map { sample in
-//            let date = Date(timeIntervalSince1970: sample.timestamp)
-//            let timeString = formatter.string(from: date)
-//            return "\(timeString),\(sample.x),\(sample.y),\(sample.z)"
-//        }.joined(separator: "\r\n")
-//
-//        let csvString = csvHeader + csvBody
-//        let fileName = "MotionData-\(Int(Date().timeIntervalSince1970)).csv"
-//        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
-//        do {
-//            try csvString.write(to: tempURL, atomically: true, encoding: .utf8)
-//            if WCSession.default.isReachable {
-//                WCSession.default.transferFile(tempURL, metadata: ["filename": fileName])
-//                WKInterfaceDevice.current().play(.success)
-//                
-//            } else {
-//                WKInterfaceDevice.current().play(.failure)
-//            }
-//        } catch {
-//            WKInterfaceDevice.current().play(.failure)
-//        }
-//        
-//    }
+    
     func exportAndSendCSV() {
         let filenameFormatter = DateFormatter()
         filenameFormatter.dateFormat = "yyyyMMdd_HHmmss"
-        let fileName = "MotionData-\(filenameFormatter.string(from: Date())).csv"
+        let fileName = "\(currentTestType).csv"
+        
         
         let timeFormatter = DateFormatter()
         timeFormatter.dateFormat = "HH:mm:ss"
-
+        
         let csvHeader = [
             "timestamp",
             "raw_accel_x", "raw_accel_y", "raw_accel_z",
@@ -152,7 +126,7 @@ class MotionManager: NSObject, ObservableObject, WCSessionDelegate {
             "user_accel_x", "user_accel_y", "user_accel_z",
             "quaternion_x", "quaternion_y", "quaternion_z", "quaternion_w"
         ].joined(separator: ",")
-
+        
         let csvBody = samples.map { sample in
             let date = Date(timeIntervalSince1970: sample.timestamp)
             let timeString = timeFormatter.string(from: date)
@@ -166,9 +140,9 @@ class MotionManager: NSObject, ObservableObject, WCSessionDelegate {
                 String(sample.quatX), String(sample.quatY), String(sample.quatZ), String(sample.quatW)
             ].joined(separator: ",")
         }.joined(separator: "\n")
-
+        
         let csvString = csvHeader + "\n" + csvBody
-
+        
         
         // 3. File handling and transfer (unchanged)
         let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
@@ -178,9 +152,9 @@ class MotionManager: NSObject, ObservableObject, WCSessionDelegate {
                 WCSession.default.transferFile(tempURL, metadata: ["filename": fileName])
                 WKInterfaceDevice.current().play(.success)
                 self.showSentPopup = true  // Show popup
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                        self.showSentPopup = false  // Hide after 2 seconds
-                    }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    self.showSentPopup = false  // Hide after 2 seconds
+                }
             } else {
                 WKInterfaceDevice.current().play(.failure)
             }
@@ -194,5 +168,24 @@ class MotionManager: NSObject, ObservableObject, WCSessionDelegate {
         WKInterfaceDevice.current().play(.directionDown)
     }
     
-    func session (_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {}
+    // MARK: - WCSessionDelegate
+    
+    func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
+        // You can leave this empty or add print/debug info if you want
+    }
+    
+    func session(_ session: WCSession, didReceiveMessage message: [String : Any]) {
+        // Your logic to handle messages from the phone (e.g., set useTimer/currentTestType)
+        if let needsTimer = message["needsTimer"] as? Bool {
+            DispatchQueue.main.async {
+                self.useTimer = needsTimer
+            }
+        }
+        if let testType = message["testType"] as? String {
+            DispatchQueue.main.async {
+                self.currentTestType = testType
+            }
+        }
+    }
 }
+

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		842076412DF0BDDC00A6D49E /* Watch App for Motion Data Collection Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 842076212DF0BDDB00A6D49E /* Watch App for Motion Data Collection Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		8494F50D2E145FAF0038017F /* TestType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8494F50C2E145FA60038017F /* TestType.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -69,6 +70,7 @@
 		842076212DF0BDDB00A6D49E /* Watch App for Motion Data Collection Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Watch App for Motion Data Collection Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		8420762D2DF0BDDC00A6D49E /* Watch App for Motion Data Collection Watch AppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Watch App for Motion Data Collection Watch AppTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		842076372DF0BDDC00A6D49E /* Watch App for Motion Data Collection Watch AppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Watch App for Motion Data Collection Watch AppUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		8494F50C2E145FA60038017F /* TestType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestType.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -153,6 +155,7 @@
 		842075EA2DF0BD7D00A6D49E = {
 			isa = PBXGroup;
 			children = (
+				8494F50C2E145FA60038017F /* TestType.swift */,
 				842075F52DF0BD7D00A6D49E /* Motion Collector */,
 				842076032DF0BD7E00A6D49E /* Motion CollectorTests */,
 				8420760D2DF0BD7E00A6D49E /* Motion CollectorUITests */,
@@ -425,6 +428,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8494F50D2E145FAF0038017F /* TestType.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -769,7 +773,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "anikag.Motion-Collector.watchkitapp";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
-				SKIP_INSTALL = YES;
+				SKIP_INSTALL = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 4;
@@ -799,7 +803,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "anikag.Motion-Collector.watchkitapp";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
-				SKIP_INSTALL = YES;
+				SKIP_INSTALL = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 4;

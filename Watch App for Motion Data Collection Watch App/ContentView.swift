@@ -12,7 +12,7 @@ import WatchConnectivity
 struct ContentView: View {
     @StateObject private var motionManager = MotionManager()
     @State private var isCollecting = false
-    @State private var useTimer = false
+    //@State private var useTimer = false
     @State private var isCountingDown = false
     @State private var timer: Timer?
     @State private var countdown = 5
@@ -26,10 +26,70 @@ struct ContentView: View {
             ZStack {
                 VStack(spacing: 24) {
                     Spacer(minLength: 0)
-                    Toggle("10s Timer", isOn: $useTimer)
+                    if !motionManager.currentTestType.isEmpty {
+                        Text("Test: \(motionManager.currentTestType.replacingOccurrences(of: "_", with: " ").capitalized)")
+                            .font(.headline)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    }
+
+                    Toggle("10s Timer", isOn: $motionManager.useTimer)
+
                         .padding()
                     Button(action: {
-                        if useTimer {
+//                        if useTimer {
+//                            // Begin 5-second countdown
+//                            isCountingDown = true
+//                            countdown = 5
+//                            timer?.invalidate()
+//                            timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { t in
+//                                if countdown > 1 {
+//                                    countdown -= 1
+//                                    WKInterfaceDevice.current().play(.click)
+//                                } else {
+//                                    t.invalidate()
+//                                    isCountingDown = false
+//                                    // Start collection and haptic
+//                                    isCollecting = true
+//                                    motionManager.startCollecting()
+//                                    WKInterfaceDevice.current().play(.start)
+//                                    // Start 10-second timer
+//                                    timerCountdown = 10
+//                                    isTimerRunning = true
+//                                    timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { t in
+//                                        if timerCountdown > 1 {
+//                                            timerCountdown -= 1
+//                                        } else {
+//                                            t.invalidate()
+//                                            isTimerRunning = false
+//                                            isCollecting = false
+//                                            motionManager.stopCollecting()
+//                                            WKInterfaceDevice.current().play(.stop)
+//                                            DispatchQueue.main.async {
+//                                                showCollectedToast = true
+//                                            }
+//                                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+//                                                showCollectedToast = false
+//                                            }
+//                                        }
+//                                    }
+//                                }
+//                            }
+//                        } else {
+//                            // Normal manual start/stop
+//                            isCollecting.toggle()
+//                            if isCollecting {
+//                                motionManager.startCollecting()
+//                            } else {
+//                                motionManager.stopCollecting()
+//                                showCollectedToast = true
+//                                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+//                                    showCollectedToast = false
+//                                }
+//                                
+//                            }
+//                        }
+                        if motionManager.useTimer {
                             // Begin 5-second countdown
                             isCountingDown = true
                             countdown = 5
@@ -78,9 +138,9 @@ struct ContentView: View {
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                                     showCollectedToast = false
                                 }
-                                
                             }
                         }
+
                     }) {
                         Text(
                             isCountingDown
@@ -134,7 +194,7 @@ struct ContentView: View {
                 }
                 
                 if motionManager.showSentPopup {
-                    Text("Sent!")
+                    Text("Sent File!")
                         .font(.headline)
                         .padding(.vertical, 10)
                         .padding(.horizontal, 20)
