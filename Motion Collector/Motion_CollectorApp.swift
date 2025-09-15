@@ -9,9 +9,13 @@ import SwiftUI
 
 @main
 struct Motion_CollectorApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            NavigationView {
+                ContentView()
+            }
+            .navigationViewStyle(StackNavigationViewStyle())
         }
     }
 }

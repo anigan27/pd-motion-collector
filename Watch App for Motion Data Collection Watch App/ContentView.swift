@@ -1,43 +1,95 @@
+////
+////  ContentView.swift
+////  Watch App for Motion Data Collection Watch App
+////
+////  Created by Anika Ganu on 6/4/25.
+////
 //
-//  ContentView.swift
-//  Watch App for Motion Data Collection Watch App
+//import SwiftUI
+//import CoreMotion
+//import WatchConnectivity
 //
-//  Created by Anika Ganu on 6/4/25.
+//struct ContentView: View {
+//    @StateObject private var motionManager = MotionManager()
+//    @State private var isCollecting = false
+//    //@State private var useTimer = false
+//    @State private var isCountingDown = false
+//    @State private var timer: Timer?
+//    @State private var countdown = 5
+//    @State private var timerCountdown = 10
+//    @State private var isTimerRunning = false
+//    @State private var showCollectedToast = false
+//    @State private var samples: [MotionSample] = []
+//    
+//    var body: some View {
+//        ScrollView {
+//            ZStack {
+//                VStack(spacing: 24) {
+//                    Spacer(minLength: 0)
+//                    if !motionManager.currentTestType.isEmpty {
+//                        Text("Test: \(motionManager.currentTestType.replacingOccurrences(of: "_", with: " ").capitalized)")
+//                            .font(.headline)
+//                            .multilineTextAlignment(.center)
+//                            .padding(.horizontal)
+//                    }
 //
-
-import SwiftUI
-import CoreMotion
-import WatchConnectivity
-
-struct ContentView: View {
-    @StateObject private var motionManager = MotionManager()
-    @State private var isCollecting = false
-    //@State private var useTimer = false
-    @State private var isCountingDown = false
-    @State private var timer: Timer?
-    @State private var countdown = 5
-    @State private var timerCountdown = 10
-    @State private var isTimerRunning = false
-    @State private var showCollectedToast = false
-    @State private var samples: [MotionSample] = []
-    
-    var body: some View {
-        ScrollView {
-            ZStack {
-                VStack(spacing: 24) {
-                    Spacer(minLength: 0)
-                    if !motionManager.currentTestType.isEmpty {
-                        Text("Test: \(motionManager.currentTestType.replacingOccurrences(of: "_", with: " ").capitalized)")
-                            .font(.headline)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
-                    }
-
-                    Toggle("10s Timer", isOn: $motionManager.useTimer)
-
-                        .padding()
-                    Button(action: {
-//                        if useTimer {
+//                    Toggle("10s Timer", isOn: $motionManager.useTimer)
+//
+//                        .padding()
+//                    Button(action: {
+////                        if useTimer {
+////                            // Begin 5-second countdown
+////                            isCountingDown = true
+////                            countdown = 5
+////                            timer?.invalidate()
+////                            timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { t in
+////                                if countdown > 1 {
+////                                    countdown -= 1
+////                                    WKInterfaceDevice.current().play(.click)
+////                                } else {
+////                                    t.invalidate()
+////                                    isCountingDown = false
+////                                    // Start collection and haptic
+////                                    isCollecting = true
+////                                    motionManager.startCollecting()
+////                                    WKInterfaceDevice.current().play(.start)
+////                                    // Start 10-second timer
+////                                    timerCountdown = 10
+////                                    isTimerRunning = true
+////                                    timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { t in
+////                                        if timerCountdown > 1 {
+////                                            timerCountdown -= 1
+////                                        } else {
+////                                            t.invalidate()
+////                                            isTimerRunning = false
+////                                            isCollecting = false
+////                                            motionManager.stopCollecting()
+////                                            WKInterfaceDevice.current().play(.stop)
+////                                            DispatchQueue.main.async {
+////                                                showCollectedToast = true
+////                                            }
+////                                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+////                                                showCollectedToast = false
+////                                            }
+////                                        }
+////                                    }
+////                                }
+////                            }
+////                        } else {
+////                            // Normal manual start/stop
+////                            isCollecting.toggle()
+////                            if isCollecting {
+////                                motionManager.startCollecting()
+////                            } else {
+////                                motionManager.stopCollecting()
+////                                showCollectedToast = true
+////                                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+////                                    showCollectedToast = false
+////                                }
+////                                
+////                            }
+////                        }
+//                        if motionManager.useTimer {
 //                            // Begin 5-second countdown
 //                            isCountingDown = true
 //                            countdown = 5
@@ -86,130 +138,118 @@ struct ContentView: View {
 //                                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
 //                                    showCollectedToast = false
 //                                }
-//                                
 //                            }
 //                        }
-                        if motionManager.useTimer {
-                            // Begin 5-second countdown
-                            isCountingDown = true
-                            countdown = 5
-                            timer?.invalidate()
-                            timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { t in
-                                if countdown > 1 {
-                                    countdown -= 1
-                                    WKInterfaceDevice.current().play(.click)
-                                } else {
-                                    t.invalidate()
-                                    isCountingDown = false
-                                    // Start collection and haptic
-                                    isCollecting = true
-                                    motionManager.startCollecting()
-                                    WKInterfaceDevice.current().play(.start)
-                                    // Start 10-second timer
-                                    timerCountdown = 10
-                                    isTimerRunning = true
-                                    timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { t in
-                                        if timerCountdown > 1 {
-                                            timerCountdown -= 1
-                                        } else {
-                                            t.invalidate()
-                                            isTimerRunning = false
-                                            isCollecting = false
-                                            motionManager.stopCollecting()
-                                            WKInterfaceDevice.current().play(.stop)
-                                            DispatchQueue.main.async {
-                                                showCollectedToast = true
-                                            }
-                                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                                                showCollectedToast = false
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        } else {
-                            // Normal manual start/stop
-                            isCollecting.toggle()
-                            if isCollecting {
-                                motionManager.startCollecting()
-                            } else {
-                                motionManager.stopCollecting()
-                                showCollectedToast = true
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                                    showCollectedToast = false
-                                }
-                            }
-                        }
+//
+//                    }) {
+//                        Text(
+//                            isCountingDown
+//                            ? "\(countdown)"
+//                            : (isTimerRunning
+//                               ? "\(timerCountdown)"
+//                               : (isCollecting ? "Stop" : "Start"))
+//                        )
+//                        .font(.system(size: 40, weight: .bold))
+//                        .padding()
+//                        .foregroundColor(.white)
+//                        .background(isCollecting ? Color.red : Color.green)
+//                        .cornerRadius(16)
+//                    }
+//                    .disabled(isCountingDown)
+//                    
+//                    
+//                    
+//                    Button("Send to Phone") {
+//                        motionManager.exportAndSendCSV()
+//                        
+//                        
+//                    }
+//                    .font(.system(size: 22, weight: .bold))
+//                    //.frame(maxWidth: .infinity, minHeight: 50)
+//                    .background(Color.blue)
+//                    .foregroundColor(.white)
+//                    //.cornerRadius(16)
+//                    
+//                    
+//                    //.padding(.vertical, 8)
+//                    
+//                    //Button("Delete Data") {
+//                    //motionManager.deleteData()
+//                    
+//                    //}
+//                    //.foregroundColor(.red)
+//                }
+//                if showCollectedToast {
+//                    Text("Data successfully collected!")
+//                        .font(.headline)
+//                        .padding(.vertical, 10)
+//                        .padding(.horizontal, 20)
+//                        .background(Color.gray.opacity(0.9))
+//                        .foregroundColor(.white)
+//                        .cornerRadius(14)
+//                        .transition(.opacity)
+//                        .zIndex(1)
+//                    
+//                
+//                }
+//                
+//                if motionManager.showSentPopup {
+//                    Text("Sent File!")
+//                        .font(.headline)
+//                        .padding(.vertical, 10)
+//                        .padding(.horizontal, 20)
+//                        .background(Color.gray.opacity(0.9))
+//                        .foregroundColor(.white)
+//                        .cornerRadius(14)
+//                        .transition(.opacity)
+//                        .zIndex(1)
+//                }
+//            }
+//            .padding()
+//            .onDisappear {
+//                timer?.invalidate()
+//            }
+//        }
+//        
+//    }
+//}
 
-                    }) {
-                        Text(
-                            isCountingDown
-                            ? "\(countdown)"
-                            : (isTimerRunning
-                               ? "\(timerCountdown)"
-                               : (isCollecting ? "Stop" : "Start"))
-                        )
-                        .font(.system(size: 40, weight: .bold))
-                        .padding()
-                        .foregroundColor(.white)
-                        .background(isCollecting ? Color.red : Color.green)
-                        .cornerRadius(16)
-                    }
-                    .disabled(isCountingDown)
-                    
-                    
-                    
-                    Button("Send to Phone") {
-                        motionManager.exportAndSendCSV()
-                        
-                        
-                    }
-                    .font(.system(size: 22, weight: .bold))
-                    //.frame(maxWidth: .infinity, minHeight: 50)
-                    .background(Color.blue)
+
+
+import SwiftUI
+
+struct ContentView: View {
+    @StateObject private var motionManager = MotionManager()
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            VStack(spacing: 20) {
+                Spacer()
+                Text(motionManager.currentTest.replacingOccurrences(of: "_", with: " ").capitalized)
+                    .font(.title3.weight(.bold))
                     .foregroundColor(.white)
-                    //.cornerRadius(16)
-                    
-                    
-                    //.padding(.vertical, 8)
-                    
-                    //Button("Delete Data") {
-                    //motionManager.deleteData()
-                    
-                    //}
-                    //.foregroundColor(.red)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
+                if motionManager.isCollecting {
+                    Text("Collecting…")
+                        .font(.title2).bold().foregroundColor(.green)
+                        .padding(.top, 14)
+                } else {
+                    Text("Waiting to start test…")
+                        .font(.body)
+                        .foregroundColor(.yellow)
+                        .padding(.top, 14)
                 }
-                if showCollectedToast {
-                    Text("Data successfully collected!")
-                        .font(.headline)
-                        .padding(.vertical, 10)
-                        .padding(.horizontal, 20)
-                        .background(Color.gray.opacity(0.9))
-                        .foregroundColor(.white)
-                        .cornerRadius(14)
-                        .transition(.opacity)
-                        .zIndex(1)
-                    
-                
+                if !motionManager.lastErrorMsg.isEmpty {
+                    Text(motionManager.lastErrorMsg)
+                        .foregroundColor(motionManager.lastErrorMsg.contains("successfully") ? .green : .red)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 10)
                 }
-                
-                if motionManager.showSentPopup {
-                    Text("Sent File!")
-                        .font(.headline)
-                        .padding(.vertical, 10)
-                        .padding(.horizontal, 20)
-                        .background(Color.gray.opacity(0.9))
-                        .foregroundColor(.white)
-                        .cornerRadius(14)
-                        .transition(.opacity)
-                        .zIndex(1)
-                }
-            }
-            .padding()
-            .onDisappear {
-                timer?.invalidate()
+                Spacer()
             }
         }
-        
+        .onAppear { motionManager.activateSession() }
     }
 }
