@@ -4,6 +4,10 @@ import WatchConnectivity
 
 struct IdentifiableURL: Identifiable { let url: URL; var id: URL { url } }
 struct AlertMessage: Identifiable { var id: String { message }; let message: String }
+struct ResultsActionAlert: Identifiable {
+    let id = UUID()
+    let action: String
+}
 
 final class SessionState: ObservableObject {
     @Published var completedTests: Set<Int> = []
@@ -40,6 +44,7 @@ struct ContentView: View {
     @State private var csvPreviewRows: [[String]] = []
     @State private var showWelcome: Bool = true
     @State private var showResults: Bool = false
+    @State private var resultsActionAlert: ResultsActionAlert? = nil
     
     static let allTests = TestType.allCases
     static let timedTests = TestType.timed
@@ -127,7 +132,8 @@ struct ContentView: View {
                                 fileToShare: $fileToShare,
                                 showFileShare: $showFileShare,
                                 fileToDelete: $fileToDelete,
-                                sendFileResult: $sendFileResult
+                                sendFileResult: $sendFileResult,
+                                resultsActionAlert: $resultsActionAlert
                             )
                             .frame(maxWidth: 440)
                             .padding(.bottom, 22)
@@ -207,11 +213,6 @@ struct ContentView: View {
                 saveSessionState()
                 // No automatic preview; user must tap to preview
             }
-        }
-        .alert(isPresented: $showDeleteAlert) {
-            Alert(title: Text("Delete File?"), message: Text("Are you sure you want to delete this file?"), primaryButton: .destructive(Text("Delete")) {
-                // Handle file deletion
-            }, secondaryButton: .cancel())
         }
     }
     
@@ -503,7 +504,8 @@ struct ContentView: View {
         @Binding var showFileShare: Bool
         @Binding var fileToDelete: IdentifiableURL?
         @Binding var sendFileResult: AlertMessage?
-        
+        @Binding var resultsActionAlert: ResultsActionAlert?
+        @State private var showClearConfirm: Bool = false // <-- Add state for confirmation
         var body: some View {
             VStack(alignment: .center, spacing: 8) {
                 Button(action: { withAnimation { showResults.toggle() } }) {
@@ -529,7 +531,7 @@ struct ContentView: View {
                             .padding(.top, 10)
                             .padding(.bottom, 8)
                     } else {
-                        ForEach(filesMgr.files.filter { $0.lastPathComponent.lowercased() != "inbox" }.prefix(20), id: \.self) { url in
+                        ForEach(filesMgr.files.filter { $0.lastPathComponent.lowercased() != "inbox" }.prefix(20), id: \ .self) { url in
                             HStack(spacing: 12) {
                                 Text(url.lastPathComponent)
                                     .font(.callout)
@@ -593,8 +595,42 @@ struct ContentView: View {
                             .padding(.vertical, 2)
                         }
                     }
+                    // Add new buttons below file list
+                    HStack(spacing: 18) {
+                        Button(action: { resultsActionAlert = ResultsActionAlert(action: "Upload results") }) {
+                            Text("Upload results")
+                                .font(.body.bold())
+                                .padding(.vertical, 10)
+                                .padding(.horizontal, 22)
+                                .background(Capsule().fill(Color.blue.opacity(0.15)))
+                                .foregroundColor(.accentColor)
+                        }
+                        Button(action: { showClearConfirm = true }) {
+                            Text("Clear Results")
+                                .font(.body.bold())
+                                .padding(.vertical, 10)
+                                .padding(.horizontal, 22)
+                                .background(Capsule().fill(Color.red.opacity(0.15)))
+                                .foregroundColor(.red)
+                        }
+                    }
+                    .padding(.top, 10)
                 }
-            }.padding(.vertical, 12).padding(.horizontal, 17)
+            }
+            .padding(.vertical, 12).padding(.horizontal, 17)
+            .alert(item: $resultsActionAlert) { alert in
+                Alert(title: Text(alert.action), message: Text("Button pressed: \(alert.action)"), dismissButton: .default(Text("OK")))
+            }
+            .confirmationDialog("Delete all results?", isPresented: $showClearConfirm) {
+                Button("Delete all CSV files", role: .destructive) {
+                    let csvFiles = filesMgr.files.filter { $0.lastPathComponent.lowercased() != "inbox" && $0.pathExtension.lowercased() == "csv" }
+                    for url in csvFiles {
+                        filesMgr.deleteFile(url)
+                    }
+                    filesMgr.reloadFiles()
+                }
+                Button("Cancel", role: .cancel) { showClearConfirm = false }
+            }
         }
     }
     
