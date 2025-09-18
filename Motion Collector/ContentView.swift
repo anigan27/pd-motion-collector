@@ -28,7 +28,7 @@ struct ContentView: View {
     @State private var fileToPreview: URL? = nil
     @State private var fileToShare: URL? = nil
     @State private var showFileShare: Bool = false
-    @State private var fileToDelete: URL? = nil
+    @State private var fileToDelete: IdentifiableURL? = nil
     @State private var showDeleteAlert: Bool = false
     @State private var showFilePreview: Bool = false
     @State private var showRestartConfirm: Bool = false
@@ -127,7 +127,7 @@ struct ContentView: View {
                                 fileToShare: $fileToShare,
                                 showFileShare: $showFileShare,
                                 fileToDelete: $fileToDelete,
-                                showDeleteAlert: $showDeleteAlert
+                                sendFileResult: $sendFileResult
                             )
                             .frame(maxWidth: 440)
                             .padding(.bottom, 22)
@@ -162,21 +162,18 @@ struct ContentView: View {
                 ActivityView(fileURL: url, isPresented: $showFileShare)
             }
         }
-        .alert(isPresented: $showDeleteAlert) {
+        .alert(item: $fileToDelete) { idUrl in
             Alert(
                 title: Text("Delete File?"),
-                message: Text("Are you sure you want to delete this file? This cannot be undone."),
+                message: Text("Are you sure you want to delete \(idUrl.url.lastPathComponent)? This cannot be undone."),
                 primaryButton: .destructive(Text("Delete")) {
-                    if let url = fileToDelete {
-                        filesMgr.deleteFile(url)
-                        filesMgr.reloadFiles()
-                        state.filesForSession.removeAll { $0 == url.lastPathComponent }
-                        fileToDelete = nil
-                        showResults.toggle()
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { showResults.toggle() }
-                    }
+                    filesMgr.deleteFile(idUrl.url)
+                    filesMgr.reloadFiles()
+                    state.filesForSession.removeAll { $0 == idUrl.url.lastPathComponent }
+                    showResults.toggle()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { showResults.toggle() }
                 },
-                secondaryButton: .cancel { fileToDelete = nil }
+                secondaryButton: .cancel { }
             )
         }
         .alert(item: $sendFileResult) { msg in
@@ -210,6 +207,11 @@ struct ContentView: View {
                 saveSessionState()
                 // No automatic preview; user must tap to preview
             }
+        }
+        .alert(isPresented: $showDeleteAlert) {
+            Alert(title: Text("Delete File?"), message: Text("Are you sure you want to delete this file?"), primaryButton: .destructive(Text("Delete")) {
+                // Handle file deletion
+            }, secondaryButton: .cancel())
         }
     }
     
@@ -496,11 +498,11 @@ struct ContentView: View {
         @ObservedObject var filesMgr: PhoneSessionManager
         @Binding var showResults: Bool
         @Binding var fileToPreview: URL?
-        @Binding var showFilePreview: Bool // <-- Add this binding
+        @Binding var showFilePreview: Bool
         @Binding var fileToShare: URL?
         @Binding var showFileShare: Bool
-        @Binding var fileToDelete: URL?
-        @Binding var showDeleteAlert: Bool
+        @Binding var fileToDelete: IdentifiableURL?
+        @Binding var sendFileResult: AlertMessage?
         
         var body: some View {
             VStack(alignment: .center, spacing: 8) {
@@ -527,14 +529,18 @@ struct ContentView: View {
                             .padding(.top, 10)
                             .padding(.bottom, 8)
                     } else {
-                        ForEach(filesMgr.files.prefix(20), id: \.self) { url in
+                        ForEach(filesMgr.files.filter { $0.lastPathComponent.lowercased() != "inbox" }.prefix(20), id: \.self) { url in
                             HStack(spacing: 12) {
                                 Text(url.lastPathComponent)
                                     .font(.callout)
                                     .foregroundColor(.primary)
                                     .lineLimit(nil)
                                     .fixedSize(horizontal: false, vertical: true)
-                                    .frame(maxWidth: 200, alignment: .leading)
+                                    .frame(maxWidth: 150, alignment: .leading)
+                                Text(ContentView.formattedFileSize(for: url))
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .frame(minWidth: 50, alignment: .trailing)
                                 Spacer()
                                 Button(action: {
                                     fileToPreview = url
@@ -561,8 +567,15 @@ struct ContentView: View {
                                 }
                                 .buttonStyle(PlainButtonStyle())
                                 Button(action: {
-                                    fileToDelete = url
-                                    showDeleteAlert = true
+                                    // Ensure state change so alert triggers reliably
+                                    fileToDelete = nil
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                        if FileManager.default.fileExists(atPath: url.path) {
+                                            fileToDelete = IdentifiableURL(url: url)
+                                        } else {
+                                            sendFileResult = AlertMessage(message: "File does not exist or was already deleted.")
+                                        }
+                                    }
                                 }) {
                                     Image(systemName: "trash")
                                         .foregroundColor(.red)
@@ -732,5 +745,17 @@ struct ContentView: View {
             func numberOfPreviewItems(in controller: QLPreviewController) -> Int { 1 }
             func previewController(_ c: QLPreviewController, previewItemAt index: Int) -> QLPreviewItem { fileURL as NSURL }
         }
+    }
+    
+    static func formattedFileSize(for url: URL) -> String {
+        do {
+            let attr = try FileManager.default.attributesOfItem(atPath: url.path)
+            if let size = attr[.size] as? UInt64 {
+                let formatter = ByteCountFormatter()
+                formatter.countStyle = .file
+                return formatter.string(fromByteCount: Int64(size))
+            }
+        } catch {}
+        return "--"
     }
 }
