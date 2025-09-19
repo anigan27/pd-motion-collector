@@ -1,0 +1,24 @@
+{
+  "originHash" : "2f382ca4bad0bea2ed989fe2a965a2c41d416cea16be3304acdd882b7a963565",
+  "pins" : [
+    {
+      "identity" : "swiftyrsa",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/TakeScoop/SwiftyRSA.git",
+      "state" : {
+        "revision" : "6521919ad0e99dff927685f142d8136479acb452",
+        "version" : "1.8.0"
+      }
+    },
+    {
+      "identity" : "zipfoundation",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/weichsel/ZIPFoundation",
+      "state" : {
+        "revision" : "02b6abe5f6eef7e3cbd5f247c5cc24e246efcfe0",
+        "version" : "0.9.19"
+      }
+    }
+  ],
+  "version" : 3
+}

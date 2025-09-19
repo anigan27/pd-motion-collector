@@ -15,9 +15,9 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "842076202DF0BDDB00A6D49E"
-               BuildableName = "Watch App for Motion Data Collection Watch App.app"
-               BlueprintName = "Watch App for Motion Data Collection Watch App"
+               BlueprintIdentifier = "842075F22DF0BD7D00A6D49E"
+               BuildableName = "Motion Collector.app"
+               BlueprintName = "Motion Collector"
                ReferencedContainer = "container:Motion Collector.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -29,30 +29,6 @@
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES"
       shouldAutocreateTestPlan = "YES">
-      <Testables>
-         <TestableReference
-            skipped = "NO"
-            parallelizable = "YES">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "8420762C2DF0BDDC00A6D49E"
-               BuildableName = "Watch App for Motion Data Collection Watch AppTests.xctest"
-               BlueprintName = "Watch App for Motion Data Collection Watch AppTests"
-               ReferencedContainer = "container:Motion Collector.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
-         <TestableReference
-            skipped = "NO"
-            parallelizable = "YES">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "842076362DF0BDDC00A6D49E"
-               BuildableName = "Watch App for Motion Data Collection Watch AppUITests.xctest"
-               BlueprintName = "Watch App for Motion Data Collection Watch AppUITests"
-               ReferencedContainer = "container:Motion Collector.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
-      </Testables>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"
@@ -68,9 +44,9 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "842076202DF0BDDB00A6D49E"
-            BuildableName = "Watch App for Motion Data Collection Watch App.app"
-            BlueprintName = "Watch App for Motion Data Collection Watch App"
+            BlueprintIdentifier = "842075F22DF0BD7D00A6D49E"
+            BuildableName = "Motion Collector.app"
+            BlueprintName = "Motion Collector"
             ReferencedContainer = "container:Motion Collector.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -85,9 +61,9 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "842076202DF0BDDB00A6D49E"
-            BuildableName = "Watch App for Motion Data Collection Watch App.app"
-            BlueprintName = "Watch App for Motion Data Collection Watch App"
+            BlueprintIdentifier = "842075F22DF0BD7D00A6D49E"
+            BuildableName = "Motion Collector.app"
+            BlueprintName = "Motion Collector"
             ReferencedContainer = "container:Motion Collector.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>

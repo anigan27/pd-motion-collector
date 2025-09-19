@@ -1,6 +1,10 @@
 import SwiftUI
 import QuickLook
 import WatchConnectivity
+import CryptoKit
+import Foundation
+import SwiftyRSA
+import ZIPFoundation
 
 struct IdentifiableURL: Identifiable { let url: URL; var id: URL { url } }
 struct AlertMessage: Identifiable { var id: String { message }; let message: String }
@@ -133,7 +137,8 @@ struct ContentView: View {
                                 showFileShare: $showFileShare,
                                 fileToDelete: $fileToDelete,
                                 sendFileResult: $sendFileResult,
-                                resultsActionAlert: $resultsActionAlert
+                                resultsActionAlert: $resultsActionAlert,
+                                uploadAllCSVFiles: uploadAllCSVFiles
                             )
                             .frame(maxWidth: 440)
                             .padding(.bottom, 22)
@@ -222,8 +227,10 @@ struct ContentView: View {
         var body: some View {
             VStack(spacing: 38) {
                 Spacer()
-                Image(systemName: "figure.walk.motion")
-                    .font(.system(size: 94)).foregroundColor(.blue)
+                Image("Pd-icon") // Custom image from Assets.xcassets
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 256, height: 256)
                 Text("Welcome to Motion Collector")
                     .font(.system(size: 34, weight: .heavy))
                     .foregroundColor(.accentColor)
@@ -505,6 +512,7 @@ struct ContentView: View {
         @Binding var fileToDelete: IdentifiableURL?
         @Binding var sendFileResult: AlertMessage?
         @Binding var resultsActionAlert: ResultsActionAlert?
+        let uploadAllCSVFiles: () -> Void
         @State private var showClearConfirm: Bool = false // <-- Add state for confirmation
         var body: some View {
             VStack(alignment: .center, spacing: 8) {
@@ -597,7 +605,7 @@ struct ContentView: View {
                     }
                     // Add new buttons below file list
                     HStack(spacing: 18) {
-                        Button(action: { resultsActionAlert = ResultsActionAlert(action: "Upload results") }) {
+                        Button(action: { uploadAllCSVFiles() }) {
                             Text("Upload results")
                                 .font(.body.bold())
                                 .padding(.vertical, 10)
@@ -669,6 +677,7 @@ struct ContentView: View {
     }
     
     
+    
     func saveSessionState() {
         let dict: [String: Any] = [
             "completion": Array(state.completedTests),
@@ -706,6 +715,66 @@ struct ContentView: View {
     
     func shortenFileName(_ name: String) -> String {
         name.replacingOccurrences(of: "_", with: " ").split(separator: " ").prefix(3).joined(separator: " ")
+    }
+    
+    func uploadAllCSVFiles() {
+        guard let uploader = GoogleCloudUploader() else {
+            sendFileResult = AlertMessage(message: "Could not initialize Google Cloud uploader.")
+            return
+        }
+        let csvFiles = filesMgr.files.filter { $0.lastPathComponent.lowercased() != "inbox" && $0.pathExtension.lowercased() == "csv" }
+        if csvFiles.isEmpty {
+            sendFileResult = AlertMessage(message: "No CSV files to upload.")
+            return
+        }
+        
+        // Create ZIP file with date/time and random string
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyyMMdd_HHmmss"
+        let dateString = dateFormatter.string(from: Date())
+        let randomString = String((0..<5).map { _ in "ABCDEFGHIJKLMNOPQRSTUVWXYZ".randomElement()! })
+        let zipFileName = "motion_data_\(dateString)_\(randomString).zip"
+        
+        // Create temporary directory for ZIP file
+        let tempDir = FileManager.default.temporaryDirectory
+        let zipFileURL = tempDir.appendingPathComponent(zipFileName)
+        
+        // Create ZIP archive using ZIPFoundation
+        do {
+            // Remove existing ZIP file if it exists
+            try? FileManager.default.removeItem(at: zipFileURL)
+            
+            // Create ZIP archive using ZIPFoundation
+            guard let archive = Archive(url: zipFileURL, accessMode: .create) else {
+                DispatchQueue.main.async {
+                    self.sendFileResult = AlertMessage(message: "Failed to create ZIP archive")
+                }
+                return
+            }
+            
+            for csvURL in csvFiles {
+                try archive.addEntry(with: csvURL.lastPathComponent, fileURL: csvURL)
+            }
+            
+            // Upload the ZIP file
+            uploader.uploadZipFile(fileURL: zipFileURL) { success, errorMsg in
+                DispatchQueue.main.async {
+                    // Clean up temp file
+                    try? FileManager.default.removeItem(at: zipFileURL)
+                    
+                    if success {
+                        self.sendFileResult = AlertMessage(message: "Successfully uploaded \(csvFiles.count) CSV files as \(zipFileName)")
+                    } else {
+                        self.sendFileResult = AlertMessage(message: "Failed to upload ZIP file: \(errorMsg ?? "Unknown error")")
+                    }
+                }
+            }
+            
+        } catch {
+            DispatchQueue.main.async {
+                self.sendFileResult = AlertMessage(message: "Failed to create ZIP file: \(error.localizedDescription)")
+            }
+        }
     }
     
     func previewCSVorFile(_ url: URL) {
@@ -793,5 +862,145 @@ struct ContentView: View {
             }
         } catch {}
         return "--"
+    }
+}
+
+class GoogleCloudUploader {
+    private let keyFileName = "pd-data-store-08658f0645c0" // without .json
+    private let keyFileExt = "json"
+    private var serviceAccount: [String: Any] = [:]
+    private var accessToken: String?
+    private var tokenExpiry: Date?
+    private let bucketName = "pd-training-dataset" // <-- Set your bucket name here
+
+    init?() {
+        guard let url = Bundle.main.url(forResource: keyFileName, withExtension: keyFileExt),
+              let data = try? Data(contentsOf: url),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            print("Could not load Google Cloud JSON key file.")
+            return nil
+        }
+        self.serviceAccount = json
+    }
+
+    // MARK: - JWT Generation
+    private func generateJWT() -> String? {
+        guard let clientEmail = serviceAccount["client_email"] as? String,
+              let privateKey = serviceAccount["private_key"] as? String,
+              let tokenURI = serviceAccount["token_uri"] as? String else { return nil }
+        let header = ["alg": "RS256", "typ": "JWT"]
+        let iat = Int(Date().timeIntervalSince1970)
+        let exp = iat + 3600
+        let payload: [String: Any] = [
+            "iss": clientEmail,
+            "scope": "https://www.googleapis.com/auth/devstorage.read_write",
+            "aud": tokenURI,
+            "exp": exp,
+            "iat": iat
+        ]
+        func base64url(_ data: Data) -> String {
+            return data.base64EncodedString().replacingOccurrences(of: "+", with: "-")
+                .replacingOccurrences(of: "/", with: "_")
+                .replacingOccurrences(of: "=", with: "")
+        }
+        guard let headerData = try? JSONSerialization.data(withJSONObject: header),
+              let payloadData = try? JSONSerialization.data(withJSONObject: payload) else { return nil }
+        let headerB64 = base64url(headerData)
+        let payloadB64 = base64url(payloadData)
+        let signingInput = "\(headerB64).\(payloadB64)"
+        // Extract private key from PEM
+        let keyLines = privateKey.components(separatedBy: "\n").filter { !$0.contains("PRIVATE KEY") && !$0.isEmpty }
+        let keyBase64 = keyLines.joined()
+        guard let keyData = Data(base64Encoded: keyBase64) else { return nil }
+        // Sign with CryptoKit
+        guard let signature = try? RSASigner.sign(data: signingInput.data(using: .utf8)!, privateKey: keyData) else { return nil }
+        let signatureB64 = base64url(signature)
+        return "\(signingInput).\(signatureB64)"
+    }
+
+    // MARK: - Get Access Token
+    func fetchAccessToken(completion: @escaping (String?) -> Void) {
+        if let token = accessToken, let expiry = tokenExpiry, expiry > Date() {
+            completion(token)
+            return
+        }
+        guard let tokenURI = serviceAccount["token_uri"] as? String,
+              let jwt = generateJWT() else { completion(nil); return }
+        var req = URLRequest(url: URL(string: tokenURI)!)
+        req.httpMethod = "POST"
+        req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        let body = "grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=\(jwt)"
+        req.httpBody = body.data(using: .utf8)
+        URLSession.shared.dataTask(with: req) { data, resp, err in
+            guard let data = data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let token = json["access_token"] as? String,
+                  let expiresIn = json["expires_in"] as? Double else { completion(nil); return }
+            self.accessToken = token
+            self.tokenExpiry = Date().addingTimeInterval(expiresIn)
+            completion(token)
+        }.resume()
+    }
+
+    // MARK: - Upload CSV File
+    func uploadCSVFile(fileURL: URL, completion: @escaping (Bool, String?) -> Void) {
+        fetchAccessToken { token in
+            guard let token = token else { completion(false, "Could not get access token"); return }
+            let fileName = fileURL.lastPathComponent
+            let uploadURL = "https://storage.googleapis.com/upload/storage/v1/b/\(self.bucketName)/o?uploadType=media&name=\(fileName)"
+            var req = URLRequest(url: URL(string: uploadURL)!)
+            req.httpMethod = "POST"
+            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            req.setValue("text/csv", forHTTPHeaderField: "Content-Type")
+            guard let fileData = try? Data(contentsOf: fileURL) else { completion(false, "Could not read file"); return }
+            req.httpBody = fileData
+            URLSession.shared.dataTask(with: req) { data, resp, err in
+                if let err = err { completion(false, err.localizedDescription); return }
+                guard let httpResp = resp as? HTTPURLResponse else { completion(false, "No response"); return }
+                if httpResp.statusCode == 200 {
+                    completion(true, nil)
+                } else {
+                    let msg = String(data: data ?? Data(), encoding: .utf8)
+                    completion(false, "Upload failed: \(msg ?? "Unknown error")")
+                }
+            }.resume()
+        }
+    }
+    
+    // MARK: - Upload ZIP File
+    func uploadZipFile(fileURL: URL, completion: @escaping (Bool, String?) -> Void) {
+        fetchAccessToken { token in
+            guard let token = token else { completion(false, "Could not get access token"); return }
+            let fileName = fileURL.lastPathComponent
+            let uploadURL = "https://storage.googleapis.com/upload/storage/v1/b/\(self.bucketName)/o?uploadType=media&name=\(fileName)"
+            var req = URLRequest(url: URL(string: uploadURL)!)
+            req.httpMethod = "POST"
+            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            req.setValue("application/zip", forHTTPHeaderField: "Content-Type")
+            guard let fileData = try? Data(contentsOf: fileURL) else { completion(false, "Could not read ZIP file"); return }
+            req.httpBody = fileData
+            URLSession.shared.dataTask(with: req) { data, resp, err in
+                if let err = err { completion(false, err.localizedDescription); return }
+                guard let httpResp = resp as? HTTPURLResponse else { completion(false, "No response"); return }
+                if httpResp.statusCode == 200 {
+                    completion(true, nil)
+                } else {
+                    let msg = String(data: data ?? Data(), encoding: .utf8)
+                    completion(false, "Upload failed: \(msg ?? "Unknown error")")
+                }
+            }.resume()
+        }
+    }
+}
+
+// Helper for RSA signing (CryptoKit does not support RSA private key signing directly)
+struct RSASigner {
+    static func sign(data: Data, privateKey: Data) throws -> Data {
+        // Convert privateKey Data to PEM string
+        let pemString = "-----BEGIN PRIVATE KEY-----\n" + privateKey.base64EncodedString(options: [.lineLength64Characters, .endLineWithLineFeed]) + "\n-----END PRIVATE KEY-----"
+        let key = try PrivateKey(pemEncoded: pemString)
+        let clear = ClearMessage(data: data)
+        let signature = try clear.signed(with: key, digestType: .sha256)
+        return signature.data
     }
 }
