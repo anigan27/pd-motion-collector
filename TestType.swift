@@ -68,17 +68,17 @@ enum TestType: String, CaseIterable, Identifiable {
     }
     var instructions: String {
         switch self {
-        case .Tap: return "Tap your index finger as fast as you can for 10 seconds."
+        case .Tap: return "Tap your index finger to thumb as fast as you can for 10 seconds."
         case .Fist: return "Open and close your fist rapidly for 10 seconds."
         case .Pronate: return "Rotate your wrist back and forth for 10 seconds."
-        case .Walk: return "Walk with natural arm swings for 10 seconds."
+        case .Walk: return "Walk in a straight line with natural arm swings for 10 seconds."
         case .Knees: return "Sit with hands on knees for 10 seconds."
-        case .Toe: return "Tap your toe for 10 seconds."
+        case .Toe: return "With hands on knees, tap your toe for 10 seconds."
         case .Nose: return "Touch your finger to your nose and out for 10 seconds."
-        case .StartStop: return "Start and stop walking at your own pace. Press Start to begin, Stop when done."
-        case .Bottle: return "Twist open and close a bottle cap. Press Start to begin, Stop when done."
-        case .Button: return "Button and unbutton a shirt. Press Start to begin, Stop when done."
-        case .Paper: return "Fold a piece of paper in half repeatedly. Press Start to begin, Stop when done."
+        case .StartStop: return "Walk 5 steps, then pause, then walk 5 steps again. Press Start to begin, Stop when done."
+        case .Bottle: return "Twist open and close a bottle cap repeatedly for 5 times. Press Start to begin, Stop when done."
+        case .Button: return "Button and unbutton a shirt 5 times. Press Start to begin, Stop when done."
+        case .Paper: return "Fold a piece of paper, crease at half, fold again and crease . Press Start to begin, Stop when done."
         }
     }
     var isTimed: Bool {

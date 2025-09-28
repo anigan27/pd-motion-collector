@@ -357,41 +357,61 @@ struct ContentView: View {
         let testIsComplete: (Int) -> Bool
         let sendWatchTestCommand: (String, TestType) -> Void
         var body: some View {
-            VStack(spacing: 20) {
-                Section(header:
-                            Text("Timed Tests").font(.title2.weight(.bold)).foregroundColor(.accentColor).frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.top, 4)
-                ) {
-                    ForEach(Array(timedTests.enumerated()), id: \.offset) { i, test in
-                        // Use the index in allTests, not just timedTests
-                        let mainIdx = ContentView.allTests.firstIndex(of: test) ?? i
-                        TestCard(
-                            test: test,
-                            isComplete: testIsComplete(mainIdx),
-                            selected: mainIdx == nextTestIndex,
-                            onStart: {
-                                sendWatchTestCommand("wait", test)
-                                state.idx = mainIdx; state.step = 2
-                            }
-                        )
+            ScrollViewReader { proxy in
+                VStack(spacing: 20) {
+                    Section(header:
+                                Text("Timed Tests").font(.title2.weight(.bold)).foregroundColor(.accentColor).frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.top, 4)
+                    ) {
+                        ForEach(Array(timedTests.enumerated()), id: \.offset) { i, test in
+                            // Use the index in allTests, not just timedTests
+                            let mainIdx = ContentView.allTests.firstIndex(of: test) ?? i
+                            TestCard(
+                                test: test,
+                                isComplete: testIsComplete(mainIdx),
+                                selected: mainIdx == nextTestIndex,
+                                onStart: {
+                                    sendWatchTestCommand("wait", test)
+                                    state.idx = mainIdx; state.step = 2
+                                }
+                            )
+                            .id("test_\(mainIdx)") // Add ID for scrolling
+                        }
+                    }
+                    Section(header:
+                                Text("Untimed Tests").font(.title2.weight(.bold)).foregroundColor(.accentColor).frame(maxWidth:.infinity, alignment:.center)
+                        .padding(.top, 14)
+                    ) {
+                        ForEach(Array(untimedTests.enumerated()), id: \.offset) { j, test in
+                            // Use the actual index in allTests to ensure correct test numbering
+                            let mainIdx = ContentView.allTests.firstIndex(of: test) ?? j
+                            TestCard(
+                                test: test,
+                                isComplete: testIsComplete(mainIdx),
+                                selected: mainIdx == nextTestIndex,
+                                onStart: {
+                                    sendWatchTestCommand("wait", test)
+                                    state.idx = mainIdx; state.step = 2
+                                }
+                            )
+                            .id("test_\(mainIdx)") // Add ID for scrolling
+                        }
                     }
                 }
-                Section(header:
-                            Text("Untimed Tests").font(.title2.weight(.bold)).foregroundColor(.accentColor).frame(maxWidth:.infinity, alignment:.center)
-                    .padding(.top, 14)
-                ) {
-                    ForEach(Array(untimedTests.enumerated()), id: \.offset) { j, test in
-                        // Use the actual index in allTests to ensure correct test numbering
-                        let mainIdx = ContentView.allTests.firstIndex(of: test) ?? j
-                        TestCard(
-                            test: test,
-                            isComplete: testIsComplete(mainIdx),
-                            selected: mainIdx == nextTestIndex,
-                            onStart: {
-                                sendWatchTestCommand("wait", test)
-                                state.idx = mainIdx; state.step = 2
-                            }
-                        )
+                .onAppear {
+                    // Auto-scroll to the selected test when view appears
+                    if nextTestIndex < ContentView.allTests.count {
+                        withAnimation(.easeInOut(duration: 0.6)) {
+                            proxy.scrollTo("test_\(nextTestIndex)", anchor: .center)
+                        }
+                    }
+                }
+                .onChange(of: nextTestIndex) { oldValue, newIndex in
+                    // Auto-scroll when the selected test changes
+                    if newIndex < ContentView.allTests.count {
+                        withAnimation(.easeInOut(duration: 0.6)) {
+                            proxy.scrollTo("test_\(newIndex)", anchor: .center)
+                        }
                     }
                 }
             }

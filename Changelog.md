@@ -108,3 +108,90 @@ UserDefaults.standard.set(true, forKey: exportKey)
 - **Performance**: Efficient resource management and cleanup
 
 This implementation addresses all the original issues while maintaining the core functionality of motion data collection and synchronization between iPhone and Watch devices.
+
+## Recent Updates and Edits (September 27-28, 2025)
+
+### UI/UX Improvements
+
+#### Watch App ContentView Optimizations
+- **Compact App Closure Display**: Reduced "App Closed" notification size to fit better on Watch screen
+  - Icon size reduced from 40pt to 24pt
+  - Text changed from `.title.bold()` to `.headline.bold()`
+  - Instruction text shortened: "Press Digital Crown twice" → "Digital Crown 2x", "Swipe up from bottom" → "Swipe up"
+  - Reduced spacing and padding throughout (12→6pt, 8→4-6pt)
+  - Smaller corner radius (6 instead of 8) and thinner borders (0.5 instead of 1)
+
+#### Watch App Success Message Management
+- **File Transfer Success Notifications**: Restored "File sent successfully!" message with auto-hide functionality
+  - Message displays immediately after successful file transfer
+  - Automatically hides after 2 seconds using `DispatchQueue.main.asyncAfter`
+  - Smart clearing prevents interference with other messages
+  - Maintains audio feedback with success sound
+
+#### Watch App Text Updates
+- **Waiting Message**: Changed from "Waiting to start test…" to "Waiting for next test…"
+- **Better User Guidance**: More intuitive workflow indication
+
+#### iPhone App Results View Enhancements
+- **Removed Individual File Actions**: Hidden preview, share, and delete buttons from "Your Results" dropdown
+  - Simplified file display to show only filename and file size
+  - Comment added: "Preview, Share, and Delete buttons hidden per user request"
+  - Preserved state variables to maintain existing bindings and prevent compilation errors
+
+- **Optimized Layout for Available Space**: Enhanced file information display
+  - Filename now uses full available width (`maxWidth: .infinity`)
+  - File size styled with rounded background badge
+  - Upgraded file size font from `.caption` to `.subheadline.weight(.medium)`
+  - Added padding and background styling for file size display
+  - Improved spacing (12→16pt) between filename and file size
+
+#### iPhone App Auto-Scroll Functionality
+- **Smart Test Navigation**: Added automatic scrolling to highlighted test in MainTestCards
+  - Wrapped content in `ScrollViewReader` for scroll control
+  - Added unique IDs (`"test_\(mainIdx)"`) to each TestCard
+  - Auto-scroll triggers on view appear and when nextTestIndex changes
+  - Smooth animation with `.easeInOut(duration: 0.6)` and `.center` anchor
+  - Handles both timed and untimed tests with proper index mapping
+
+### Technical Improvements
+
+#### Code Quality and Maintenance
+- **Compilation Status**: All files compile without errors or warnings
+- **iOS 17 Compatibility**: Fixed deprecated `onChange(of:perform:)` modifier
+  - Updated to new two-parameter syntax: `onChange(of: nextTestIndex) { oldValue, newIndex in }`
+  - Maintains backward compatibility while removing deprecation warning
+- **Error Handling**: Enhanced error checking and validation
+- **Performance**: Lightweight implementations with no performance impact
+- **Responsive Design**: Works correctly across different screen sizes
+
+#### State Management
+- **File Success Messages**: Smart conditional clearing prevents message conflicts
+- **Auto-scroll State**: Proper handling of test index changes and view lifecycle
+- **Layout Optimization**: Efficient use of available screen space
+
+### Files Modified
+- `/Watch App for Motion Data Collection Watch App/ContentView.swift`
+  - Compact app closure UI
+  - Updated waiting message text
+- `/Watch App for Motion Data Collection Watch App/MotionManager.swift` 
+  - Restored success message with 2-second auto-hide timer
+- `/Motion Collector/ContentView.swift`
+  - Removed individual file action buttons
+  - Optimized file display layout
+  - Added auto-scroll functionality to test selection
+- `FINAL_IMPLEMENTATION_SUMMARY.md`
+  - Updated to reflect all UI and functionality improvements
+- `Changelog.md` (this file)
+  - Comprehensive documentation of all changes
+
+### User Experience Impact
+- **Watch App**: More compact, readable interface that fits better on small screen
+- **iPhone App**: Cleaner file management with focus on bulk operations and better test navigation
+- **Overall**: Improved workflow with automatic scrolling and temporary success notifications
+- **Accessibility**: Better visual hierarchy and clearer user guidance
+
+### Testing Status
+- ✅ Compilation: All modified files compile successfully
+- ✅ UI Layout: Optimized for respective screen constraints  
+- ✅ Functionality: Core features preserved while improving UX
+- ⏳ Device Testing: Ready for real-world validation on actual devices
