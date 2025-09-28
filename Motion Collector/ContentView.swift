@@ -33,6 +33,7 @@ final class SessionState: ObservableObject {
 struct ContentView: View {
     @StateObject private var state = SessionState()
     @StateObject private var filesMgr = PhoneSessionManager()
+    @StateObject private var connectionManager = ContentViewConnectionManager()
     @State private var fileToPreview: URL? = nil
     @State private var fileToShare: URL? = nil
     @State private var showFileShare: Bool = false
@@ -49,6 +50,7 @@ struct ContentView: View {
     @State private var showWelcome: Bool = true
     @State private var showResults: Bool = false
     @State private var resultsActionAlert: ResultsActionAlert? = nil
+    @State private var isWatchConnected: Bool = false
     
     static let allTests = TestType.allCases
     static let timedTests = TestType.timed
@@ -77,12 +79,24 @@ struct ContentView: View {
                                 .padding(.top, 12)
                         }
                         if !showWelcome {
+                            // Connection status indicator
+                            ConnectionStatusView(
+                                isConnected: connectionManager.isConnected,
+                                connectionQuality: connectionManager.connectionQuality
+                            )
+                                .padding(.horizontal, 20)
+                                .padding(.bottom, 10)
+                            
                             if isSessionComplete {
-                                SessionCompleteScreen(onRestart: { showRestartConfirm = true })
+                                SessionCompleteScreen(
+                                    onRestart: { showRestartConfirm = true },
+                                    uploadAllCSVFiles: uploadAllCSVFiles,
+                                    closeWatchApp: closeWatchApp,
+                                    filesMgr: filesMgr,
+                                    resultsActionAlert: $resultsActionAlert
+                                )
                                     .frame(maxWidth: 420)
                                     .padding(.vertical, 8)
-                                RestartBar(onRestart: { showRestartConfirm = true })
-                                    .padding(.bottom, 10)
                             } else if state.step == 1 {
                                 MainTestCards(
                                     state: state,
@@ -121,10 +135,17 @@ struct ContentView: View {
                                     .padding(.top, 8)
                                 }
                             } else if state.step == 4, let test = curTest {
-                                DoneTestScreen(test: test, onNext: {
-                                    state.idx += 1
-                                    if state.idx < allTests.count { state.step = 1 }
-                                })
+                                DoneTestScreen(
+                                    test: test, 
+                                    onNext: {
+                                        // Always go back to test selection if there are incomplete tests
+                                        if state.completedTests.count < allTests.count {
+                                            state.step = 1 // Go back to test selection screen
+                                        }
+                                        // If all tests are complete, stay on completion screen (step 4)
+                                    },
+                                    remainingTests: allTests.count - state.completedTests.count
+                                )
                                 .frame(maxWidth: 420)
                                 .padding(.top, 9)
                             }
@@ -138,7 +159,9 @@ struct ContentView: View {
                                 fileToDelete: $fileToDelete,
                                 sendFileResult: $sendFileResult,
                                 resultsActionAlert: $resultsActionAlert,
-                                uploadAllCSVFiles: uploadAllCSVFiles
+                                uploadAllCSVFiles: uploadAllCSVFiles,
+                                closeWatchApp: closeWatchApp,
+                                isSessionComplete: isSessionComplete
                             )
                             .frame(maxWidth: 440)
                             .padding(.bottom, 22)
@@ -151,7 +174,7 @@ struct ContentView: View {
         .sheet(isPresented: $showTablePreview) {
             NavigationView {
                 if let error = previewError {
-                    ScrollView {
+                    ScrollView(.vertical) {
                         Text(error).foregroundColor(.red).font(.system(.callout, design: .monospaced)).padding()
                     }
                     .navigationTitle(tablePreviewTitle)
@@ -193,8 +216,7 @@ struct ContentView: View {
         .confirmationDialog("Restart Session?", isPresented: $showRestartConfirm) {
             Button("Delete session files and restart", role: .destructive) {
                 filesMgr.deleteSessionFiles(sessionFileList: state.filesForSession)
-                state.resetSession()
-                saveSessionState()
+                restartSession()
                 showWelcome = true
             }
             Button("Cancel", role: .cancel) { showRestartConfirm = false }
@@ -208,6 +230,12 @@ struct ContentView: View {
             let allFnames = filesMgr.allFiles.map { $0.lastPathComponent }
             state.filesForSession = state.filesForSession.filter { allFnames.contains($0) }
             saveSessionState()
+            
+            // Use enhanced connection manager for connection state
+            isWatchConnected = connectionManager.isConnected
+            
+            // Start watch session with enhanced reliability
+            startWatchSession()
         }
         .onReceive(NotificationCenter.default.publisher(for: .didReceiveWatchFile)) { _ in
             filesMgr.reloadFiles()
@@ -218,6 +246,73 @@ struct ContentView: View {
                 saveSessionState()
                 // No automatic preview; user must tap to preview
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .watchConnectionChanged)) { notification in
+            if let connected = notification.object as? Bool {
+                // Update both old and new connection status for compatibility
+                isWatchConnected = connected
+                if connected {
+                    print("[DEBUG] iPhone: Watch connection restored - using enhanced session restart")
+                    startWatchSession() 
+                }
+            }
+        }
+    }
+    
+    // MARK: - Session Management Methods
+    
+    func startWatchSession() {
+        sendWatchTestCommand("startSession", allTests[0]) // Use first test as placeholder
+        print("[MotionCollector] Started watch session")
+    }
+
+    func endWatchSession() {
+        sendWatchTestCommand("endSession", allTests[0]) // Use first test as placeholder
+        print("[MotionCollector] Ended watch session")
+    }
+
+    func restartSession() {
+        endWatchSession() // End current watch session
+        state.resetSession()
+        saveSessionState()
+        startWatchSession() // Start new watch session
+    }
+    
+    func closeWatchApp() {
+        sendWatchTestCommand("closeApp", allTests[0]) // Use first test as placeholder
+        print("[MotionCollector] Sent close command to watch app")
+    }
+    
+    // MARK: - Helper Structs for UI Components
+    
+    struct ActivityView: UIViewControllerRepresentable {
+        let fileURL: URL
+        @Binding var isPresented: Bool
+        func makeUIViewController(context: Context) -> UIActivityViewController {
+            let controller = UIActivityViewController(activityItems: [fileURL], applicationActivities: nil)
+            controller.completionWithItemsHandler = { _, _, _, _ in
+                isPresented = false
+            }
+            return controller
+        }
+        func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+    }
+    
+    struct QLPreviewControllerWrapper: UIViewControllerRepresentable {
+        let fileURL: URL
+        typealias UIViewControllerType = QLPreviewController
+        func makeUIViewController(context: Context) -> QLPreviewController {
+            let controller = QLPreviewController()
+            controller.dataSource = context.coordinator
+            return controller
+        }
+        func updateUIViewController(_ uiViewController: QLPreviewController, context: Context) {}
+        func makeCoordinator() -> Coordinator { Coordinator(fileURL: fileURL) }
+        class Coordinator: NSObject, QLPreviewControllerDataSource {
+            let fileURL: URL
+            init(fileURL: URL) { self.fileURL = fileURL }
+            func numberOfPreviewItems(in controller: QLPreviewController) -> Int { 1 }
+            func previewController(_ c: QLPreviewController, previewItemAt index: Int) -> QLPreviewItem { fileURL as NSURL }
         }
     }
     
@@ -254,25 +349,6 @@ struct ContentView: View {
         }
     }
     
-    struct RestartBar: View {
-        let onRestart: () -> Void
-        var body: some View {
-            HStack {
-                Spacer()
-                Button(action: onRestart) {
-                    Image(systemName: "arrow.triangle.2.circlepath")
-                        .font(.title2)
-                        .foregroundColor(.blue)
-                    Text("Restart Session")
-                        .font(.title3.bold())
-                        .foregroundColor(.accentColor)
-                }
-                Spacer()
-            }
-            .padding(.top, 18)
-        }
-    }
-    
     struct MainTestCards: View {
         @ObservedObject var state: SessionState
         let timedTests: [TestType]
@@ -305,8 +381,8 @@ struct ContentView: View {
                     .padding(.top, 14)
                 ) {
                     ForEach(Array(untimedTests.enumerated()), id: \.offset) { j, test in
-                        // Use the index in allTests, not just untimedTests
-                        let mainIdx = ContentView.allTests.firstIndex(of: test) ?? (j + timedTests.count)
+                        // Use the actual index in allTests to ensure correct test numbering
+                        let mainIdx = ContentView.allTests.firstIndex(of: test) ?? j
                         TestCard(
                             test: test,
                             isComplete: testIsComplete(mainIdx),
@@ -327,13 +403,21 @@ struct ContentView: View {
         let isComplete: Bool
         let selected: Bool
         let onStart: () -> Void
+        
+        // Get test number from all tests array
+        var testNumber: Int {
+            if let index = ContentView.allTests.firstIndex(of: test) {
+                return index + 1
+            }
+            return 0
+        }
         var body: some View {
             VStack(spacing: 12) {
                 Image(systemName:"rectangle.and.pencil.and.ellipsis")
                     .font(.system(size:42))
                     .foregroundColor(selected ? .accentColor : (isComplete ? .green : .blue))
                     .padding(.top,6)
-                Text(test.rawValue)
+                Text("Test \(testNumber): \(test.rawValue)")
                     .font(.title3.weight(selected ? .bold : .regular))
                     .foregroundColor(isComplete ? .green : .accentColor)
                     .multilineTextAlignment(.center)
@@ -406,30 +490,39 @@ struct ContentView: View {
         let sendWatchTestCommand: (String, TestType) -> Void
         @State private var timeLeft: Int = 10
         @State private var collecting: Bool = true
+        
+        // Get test number from all tests array
+        var testNumber: Int {
+            if let index = ContentView.allTests.firstIndex(of: test) {
+                return index + 1
+            }
+            return 0
+        }
+        
         var body: some View {
             VStack(spacing:33) {
                 Spacer()
                 Text("Collecting Data").font(.title.bold()).foregroundColor(.accentColor)
                 Image(systemName:"clock.arrow.circlepath").font(.system(size:66)).foregroundColor(.accentColor)
-                Text(test.rawValue).font(.title2.bold()).foregroundColor(.accentColor)
+                Text("Test \(testNumber): \(test.rawValue)").font(.title2.bold()).foregroundColor(.accentColor)
                 Text("Time left: \(timeLeft)s").font(.largeTitle.bold())
                 ProgressView(value:Double(10-timeLeft),total:10).progressViewStyle(LinearProgressViewStyle(tint:.accentColor)).scaleEffect(y:1.3).padding(.horizontal,60)
                 Spacer()
-                Button("Stop Early") {
-                    collecting = false
-                    sendWatchTestCommand("stop", test)
-                    onDone()
-                }
-                .font(.title3.bold()).foregroundColor(.red)
                 Spacer()
             }
             .onAppear {
                 Timer.scheduledTimer(withTimeInterval:1,repeats:true){t in
-                    timeLeft -= 1
-                    if timeLeft <= 0 || !collecting {
+                    if collecting {
+                        timeLeft -= 1
+                        if timeLeft <= 0 {
+                            collecting = false
+                            t.invalidate()
+                            sendWatchTestCommand("stop", test)
+                            onDone()
+                        }
+                    } else {
+                        // Stop was already called, just invalidate timer
                         t.invalidate()
-                        sendWatchTestCommand("stop", test)
-                        onDone()
                     }
                 }
             }
@@ -441,12 +534,20 @@ struct ContentView: View {
         let onDone: () -> Void
         let sendWatchTestCommand: (String, TestType) -> Void
         @State private var collecting: Bool = false
+        
+        // Get test number from all tests array
+        var testNumber: Int {
+            if let index = ContentView.allTests.firstIndex(of: test) {
+                return index + 1
+            }
+            return 0
+        }
         var body: some View {
             VStack(spacing:37){
                 Spacer()
                 Text("Manual Data Collection").font(.title.bold()).foregroundColor(.accentColor)
                 Image(systemName:"stopwatch.fill").font(.system(size:64)).foregroundColor(.accentColor)
-                Text(test.rawValue).font(.title2.bold()).foregroundColor(.accentColor)
+                Text("Test \(testNumber): \(test.rawValue)").font(.title2.bold()).foregroundColor(.accentColor)
                 Text(collecting ? "Press Stop when ready!" : "Press Start to begin").font(.body).foregroundColor(.secondary).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
                 Spacer()
                 if !collecting {
@@ -473,14 +574,23 @@ struct ContentView: View {
     struct DoneTestScreen: View {
         let test: TestType
         let onNext: () -> Void
+        let remainingTests: Int
         var body: some View {
             VStack(spacing:32){
                 Spacer()
                 Image(systemName:"checkmark.seal.fill").font(.system(size:76)).foregroundColor(.green)
                 Text("Test Complete!").font(.title.bold())
                     .foregroundColor(.accentColor)
+                
+                if remainingTests > 0 {
+                    Text("\(remainingTests) test\(remainingTests == 1 ? "" : "s") remaining").font(.title2).foregroundColor(.secondary).padding(.bottom, 8)
+                } else {
+                    Text("All tests completed!").font(.title2).foregroundColor(.green).padding(.bottom, 8)
+                }
+                
                 Text("Press Next to continue. Your CSV file for this test is in Recent Files.").font(.title3).multilineTextAlignment(.center).fixedSize(horizontal:false,vertical:true).padding(.horizontal,26)
-                Button("Next Test", action: onNext)
+                
+                Button(remainingTests > 0 ? "Continue Testing" : "View Results", action: onNext)
                     .font(.title2.bold()).padding(.vertical,12).padding(.horizontal,48).background(Capsule().fill(Color.green)).foregroundColor(.white)
                 Spacer()
             }
@@ -489,14 +599,36 @@ struct ContentView: View {
     
     struct SessionCompleteScreen: View {
         let onRestart: () -> Void
+        let uploadAllCSVFiles: () -> Void
+        let closeWatchApp: () -> Void
+        @ObservedObject var filesMgr: PhoneSessionManager
+        @Binding var resultsActionAlert: ResultsActionAlert?
+        
         var body: some View {
             VStack(spacing:36){
                 Spacer()
                 Image(systemName:"checkmark.circle.fill").font(.system(size:90)).foregroundColor(.green)
                 Text("Session Complete!").font(.system(size:34).bold()).foregroundColor(.accentColor)
                 Text("Every test is finished and your data is saved.").font(.title2).multilineTextAlignment(.center).fixedSize(horizontal:false,vertical:true).padding(.horizontal,28)
-                Button("Restart Session", action: onRestart)
-                    .font(.title2.bold()).foregroundColor(.white).padding(.vertical,15).padding(.horizontal,62).background(Capsule().fill(Color.accentColor))
+                
+                VStack(spacing: 18) {
+                    Button("Restart Session", action: onRestart)
+                        .font(.title2.bold()).foregroundColor(.white).padding(.vertical,15).padding(.horizontal,62).background(Capsule().fill(Color.accentColor))
+                    
+                    Button(action: { closeWatchApp() }) {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                            Text("Close Watch App")
+                                .font(.body.bold())
+                                .foregroundColor(.green)
+                        }
+                        .padding(.vertical, 10)
+                        .padding(.horizontal, 22)
+                        .background(Capsule().fill(Color.green.opacity(0.15)))
+                    }
+                }
+                
                 Spacer()
             }
         }
@@ -513,7 +645,9 @@ struct ContentView: View {
         @Binding var sendFileResult: AlertMessage?
         @Binding var resultsActionAlert: ResultsActionAlert?
         let uploadAllCSVFiles: () -> Void
-        @State private var showClearConfirm: Bool = false // <-- Add state for confirmation
+        let closeWatchApp: () -> Void
+        let isSessionComplete: Bool
+        @State private var showClearConfirm: Bool = false
         var body: some View {
             VStack(alignment: .center, spacing: 8) {
                 Button(action: { withAnimation { showResults.toggle() } }) {
@@ -540,59 +674,25 @@ struct ContentView: View {
                             .padding(.bottom, 8)
                     } else {
                         ForEach(filesMgr.files.filter { $0.lastPathComponent.lowercased() != "inbox" }.prefix(20), id: \ .self) { url in
-                            HStack(spacing: 12) {
+                            HStack(spacing: 16) {
                                 Text(url.lastPathComponent)
                                     .font(.callout)
                                     .foregroundColor(.primary)
                                     .lineLimit(nil)
                                     .fixedSize(horizontal: false, vertical: true)
-                                    .frame(maxWidth: 150, alignment: .leading)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                
                                 Text(ContentView.formattedFileSize(for: url))
-                                    .font(.caption)
+                                    .font(.subheadline.weight(.medium))
                                     .foregroundColor(.secondary)
-                                    .frame(minWidth: 50, alignment: .trailing)
-                                Spacer()
-                                Button(action: {
-                                    fileToPreview = url
-                                    showFilePreview = true
-                                }) {
-                                    Image(systemName: "doc.text.magnifyingglass")
-                                        .foregroundColor(.blue)
-                                        .frame(width: 32, height: 32)
-                                        .background(Circle().fill(Color(.systemGray5)))
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                                Button(action: {
-                                    if FileManager.default.fileExists(atPath: url.path) {
-                                        fileToShare = url
-                                        showFileShare = true
-                                    } else {
-                                        // Optionally, show an error or alert if file doesn't exist
-                                    }
-                                }) {
-                                    Image(systemName: "square.and.arrow.up")
-                                        .foregroundColor(.green)
-                                        .frame(width: 32, height: 32)
-                                        .background(Circle().fill(Color(.systemGray5)))
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                                Button(action: {
-                                    // Ensure state change so alert triggers reliably
-                                    fileToDelete = nil
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                                        if FileManager.default.fileExists(atPath: url.path) {
-                                            fileToDelete = IdentifiableURL(url: url)
-                                        } else {
-                                            sendFileResult = AlertMessage(message: "File does not exist or was already deleted.")
-                                        }
-                                    }
-                                }) {
-                                    Image(systemName: "trash")
-                                        .foregroundColor(.red)
-                                        .frame(width: 32, height: 32)
-                                        .background(Circle().fill(Color(.systemGray6)))
-                                }
-                                .buttonStyle(PlainButtonStyle())
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 4)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .fill(Color(.systemGray5))
+                                    )
+                                
+                                // Preview, Share, and Delete buttons hidden per user request
                             }
                             .padding(.vertical, 7)
                             .background(RoundedRectangle(cornerRadius: 11).fill(Color(.systemGray6)))
@@ -603,41 +703,45 @@ struct ContentView: View {
                             .padding(.vertical, 2)
                         }
                     }
-                    // Add new buttons below file list
-                    HStack(spacing: 18) {
-                        Button(action: { uploadAllCSVFiles() }) {
-                            Text("Upload results")
-                                .font(.body.bold())
-                                .padding(.vertical, 10)
-                                .padding(.horizontal, 22)
-                                .background(Capsule().fill(Color.blue.opacity(0.15)))
-                                .foregroundColor(.accentColor)
+                    
+                    // Action buttons for results management
+                    if !filesMgr.files.isEmpty {
+                        VStack(spacing: 12) {
+                            HStack(spacing: 18) {
+                                Button(action: { uploadAllCSVFiles() }) {
+                                    Text("Upload results")
+                                        .font(.body.bold())
+                                        .padding(.vertical, 10)
+                                        .padding(.horizontal, 22)
+                                        .background(Capsule().fill(Color.blue.opacity(0.15)))
+                                        .foregroundColor(.accentColor)
+                                }
+                                Button(action: { showClearConfirm = true }) {
+                                    Text("Clear Results")
+                                        .font(.body.bold())
+                                        .padding(.vertical, 10)
+                                        .padding(.horizontal, 22)
+                                        .background(Capsule().fill(Color.red.opacity(0.15)))
+                                        .foregroundColor(.red)
+                                }
+                            }
                         }
-                        Button(action: { showClearConfirm = true }) {
-                            Text("Clear Results")
-                                .font(.body.bold())
-                                .padding(.vertical, 10)
-                                .padding(.horizontal, 22)
-                                .background(Capsule().fill(Color.red.opacity(0.15)))
-                                .foregroundColor(.red)
-                        }
+                        .padding(.top, 12)
                     }
-                    .padding(.top, 10)
                 }
             }
             .padding(.vertical, 12).padding(.horizontal, 17)
             .alert(item: $resultsActionAlert) { alert in
                 Alert(title: Text(alert.action), message: Text("Button pressed: \(alert.action)"), dismissButton: .default(Text("OK")))
             }
-            .confirmationDialog("Delete all results?", isPresented: $showClearConfirm) {
-                Button("Delete all CSV files", role: .destructive) {
-                    let csvFiles = filesMgr.files.filter { $0.lastPathComponent.lowercased() != "inbox" && $0.pathExtension.lowercased() == "csv" }
-                    for url in csvFiles {
-                        filesMgr.deleteFile(url)
-                    }
-                    filesMgr.reloadFiles()
+            .alert("Clear All Results", isPresented: $showClearConfirm) {
+                Button("Cancel", role: .cancel) { }
+                Button("Clear All", role: .destructive) {
+                    filesMgr.clearAllFiles()
+                    resultsActionAlert = ResultsActionAlert(action: "Results cleared!")
                 }
-                Button("Cancel", role: .cancel) { showClearConfirm = false }
+            } message: {
+                Text("This will permanently delete all collected data files. This action cannot be undone.")
             }
         }
     }
@@ -702,15 +806,13 @@ struct ContentView: View {
         let message: [String: Any] = [
             "cmd": cmd,
             "testType": test.fileName,
-            "sessionID": state.sessionID
+            "sessionID": state.sessionID,
+            "timestamp": Date().timeIntervalSince1970
         ]
-        if WCSession.default.isReachable {
-            WCSession.default.sendMessage(message, replyHandler: nil, errorHandler: nil)
-        } else {
-            print("[MotionCollector] Watch is not reachable. Command not sent: \(message)")
-            let notification = AlertMessage(message: "Apple Watch is not reachable. Please check your connection.")
-            sendFileResult = notification
-        }
+        
+        // Use the enhanced connection manager for reliable delivery
+        connectionManager.sendReliableMessage(message)
+        print("[MotionCollector] Sent enhanced command: \(cmd) for test: \(test.rawValue)")
     }
     
     func shortenFileName(_ name: String) -> String {
@@ -739,18 +841,12 @@ struct ContentView: View {
         let tempDir = FileManager.default.temporaryDirectory
         let zipFileURL = tempDir.appendingPathComponent(zipFileName)
         
-        // Create ZIP archive using ZIPFoundation
+        // Remove existing ZIP file if it exists
+        try? FileManager.default.removeItem(at: zipFileURL)
+        
+        // Create ZIP archive using ZIPFoundation (throwing initializer)
         do {
-            // Remove existing ZIP file if it exists
-            try? FileManager.default.removeItem(at: zipFileURL)
-            
-            // Create ZIP archive using ZIPFoundation
-            guard let archive = Archive(url: zipFileURL, accessMode: .create) else {
-                DispatchQueue.main.async {
-                    self.sendFileResult = AlertMessage(message: "Failed to create ZIP archive")
-                }
-                return
-            }
+            let archive = try Archive(url: zipFileURL, accessMode: .create)
             
             for csvURL in csvFiles {
                 try archive.addEntry(with: csvURL.lastPathComponent, fileURL: csvURL)
@@ -772,7 +868,7 @@ struct ContentView: View {
             
         } catch {
             DispatchQueue.main.async {
-                self.sendFileResult = AlertMessage(message: "Failed to create ZIP file: \(error.localizedDescription)")
+                self.sendFileResult = AlertMessage(message: "Failed to create ZIP archive: \(error.localizedDescription)")
             }
         }
     }
@@ -821,37 +917,6 @@ struct ContentView: View {
         }
     }
     
-    struct ActivityView: UIViewControllerRepresentable {
-        let fileURL: URL
-        @Binding var isPresented: Bool
-        func makeUIViewController(context: Context) -> UIActivityViewController {
-            let controller = UIActivityViewController(activityItems: [fileURL], applicationActivities: nil)
-            controller.completionWithItemsHandler = { _, _, _, _ in
-                isPresented = false
-            }
-            return controller
-        }
-        func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
-    }
-    
-    struct QLPreviewControllerWrapper: UIViewControllerRepresentable {
-        let fileURL: URL
-        typealias UIViewControllerType = QLPreviewController
-        func makeUIViewController(context: Context) -> QLPreviewController {
-            let controller = QLPreviewController()
-            controller.dataSource = context.coordinator
-            return controller
-        }
-        func updateUIViewController(_ uiViewController: QLPreviewController, context: Context) {}
-        func makeCoordinator() -> Coordinator { Coordinator(fileURL: fileURL) }
-        class Coordinator: NSObject, QLPreviewControllerDataSource {
-            let fileURL: URL
-            init(fileURL: URL) { self.fileURL = fileURL }
-            func numberOfPreviewItems(in controller: QLPreviewController) -> Int { 1 }
-            func previewController(_ c: QLPreviewController, previewItemAt index: Int) -> QLPreviewItem { fileURL as NSURL }
-        }
-    }
-    
     static func formattedFileSize(for url: URL) -> String {
         do {
             let attr = try FileManager.default.attributesOfItem(atPath: url.path)
@@ -863,7 +928,9 @@ struct ContentView: View {
         } catch {}
         return "--"
     }
-}
+
+
+} // End of ContentView struct
 
 class GoogleCloudUploader {
     private let keyFileName = "pd-data-store-08658f0645c0" // without .json
@@ -1002,5 +1069,110 @@ struct RSASigner {
         let clear = ClearMessage(data: data)
         let signature = try clear.signed(with: key, digestType: .sha256)
         return signature.data
+    }
+}
+
+// MARK: - Connection Status View
+
+struct ConnectionStatusView: View {
+    let isConnected: Bool
+    let connectionQuality: ContentViewConnectionManager.ConnectionQuality
+    
+    var body: some View {
+        HStack {
+            Image(systemName: isConnected ? "applewatch" : "applewatch.slash")
+                .foregroundColor(isConnected ? connectionQuality.color : .red)
+                .font(.system(size: 16, weight: .semibold))
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(isConnected ? "Watch Connected" : "Watch Disconnected")
+                    .font(.caption)
+                    .foregroundColor(isConnected ? connectionQuality.color : .red)
+                    .fontWeight(.medium)
+                
+                if isConnected {
+                    Text("Quality: \(connectionQuality.description)")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isConnected ? connectionQuality.color.opacity(0.1) : Color.red.opacity(0.1))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(isConnected ? connectionQuality.color.opacity(0.3) : Color.red.opacity(0.3), lineWidth: 1)
+        )
+    }
+}
+
+// MARK: - Enhanced Connection Manager for ContentView
+class ContentViewConnectionManager: ObservableObject {
+    @Published var isConnected = false
+    @Published var connectionQuality: ConnectionQuality = .unknown
+    
+    enum ConnectionQuality {
+        case excellent, good, poor, unknown
+        
+        var description: String {
+            switch self {
+            case .excellent: return "Excellent"
+            case .good: return "Good"
+            case .poor: return "Poor"
+            case .unknown: return "Unknown"
+            }
+        }
+        
+        var color: Color {
+            switch self {
+            case .excellent: return .green
+            case .good: return .blue
+            case .poor: return .orange
+            case .unknown: return .gray
+            }
+        }
+    }
+    
+    private var updateTimer: Timer?
+    
+    init() {
+        // Sync with the AppDelegate's enhanced connection manager
+        startSyncTimer()
+    }
+    
+    private func startSyncTimer() {
+        updateTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            if let appDelegate = AppDelegate.shared {
+                DispatchQueue.main.async {
+                    self.isConnected = appDelegate.enhancedConnectionManager.isConnected
+                    
+                    // Map UIColor to SwiftUI Color
+                    switch appDelegate.enhancedConnectionManager.connectionQuality {
+                    case .excellent:
+                        self.connectionQuality = .excellent
+                    case .good:
+                        self.connectionQuality = .good
+                    case .poor:
+                        self.connectionQuality = .poor
+                    case .unknown:
+                        self.connectionQuality = .unknown
+                    }
+                }
+            }
+        }
+    }
+    
+    func sendReliableMessage(_ message: [String: Any]) {
+        AppDelegate.shared?.enhancedConnectionManager.sendReliableMessage(message)
+    }
+    
+    deinit {
+        updateTimer?.invalidate()
     }
 }

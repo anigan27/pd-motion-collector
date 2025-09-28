@@ -29,4 +29,11 @@ class PhoneSessionManager: ObservableObject {
         try? FileManager.default.removeItem(at: url)
         reloadFiles()
     }
+    
+    func clearAllFiles() {
+        for url in files {
+            try? FileManager.default.removeItem(at: url)
+        }
+        reloadFiles()
+    }
 }

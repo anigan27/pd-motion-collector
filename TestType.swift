@@ -64,7 +64,7 @@ enum TestType: String, CaseIterable, Identifiable {
         [.Tap, .Fist, .Pronate, .Walk, .Knees, .Toe, .Nose]
     }
     static var untimed: [TestType] {
-        [.StartStop, .Button, .Bottle, .Paper]
+        [.StartStop, .Bottle, .Button, .Paper]
     }
     var instructions: String {
         switch self {

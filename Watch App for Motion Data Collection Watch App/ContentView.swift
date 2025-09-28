@@ -223,31 +223,92 @@ struct ContentView: View {
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            VStack(spacing: 20) {
-                Spacer()
+            VStack(spacing: 8) {
+                Spacer(minLength: 4)
+                
+                // Connection status indicator
+                HStack {
+                    Image(systemName: motionManager.isConnected ? "iphone" : "iphone.slash")
+                        .foregroundColor(motionManager.isConnected ? .green : .orange)
+                        .font(.system(size: 14, weight: .semibold))
+                    
+                    Text(motionManager.isConnected ? "Connected" : "Disconnected")
+                        .font(.caption2)
+                        .foregroundColor(motionManager.isConnected ? .green : .orange)
+                        .fontWeight(.medium)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    Capsule()
+                        .fill(motionManager.isConnected ? Color.green.opacity(0.2) : Color.orange.opacity(0.2))
+                )
+                
                 Text(motionManager.currentTest.replacingOccurrences(of: "_", with: " ").capitalized)
-                    .font(.title3.weight(.bold))
-                    .foregroundColor(.white)
+                    .font(motionManager.currentTest == "App Closed" ? .headline.weight(.bold) : .title3.weight(.bold))
+                    .foregroundColor(motionManager.currentTest == "App Closed" ? .red : .white)
                     .multilineTextAlignment(.center)
                     .lineLimit(nil)
                     .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 4)
                 if motionManager.isCollecting {
                     Text("Collecting…")
                         .font(.title2).bold().foregroundColor(.green)
-                        .padding(.top, 14)
+                        .padding(.top, 8)
+                } else if motionManager.currentTest == "App Closed" {
+                    VStack(spacing: 6) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundColor(.red)
+                        
+                        Text("App Closed")
+                            .font(.headline.bold())
+                            .foregroundColor(.red)
+                        
+                        VStack(spacing: 2) {
+                            Text("To Exit:")
+                                .font(.caption.weight(.medium))
+                                .foregroundColor(.white)
+                            
+                            Text("Digital Crown 2x")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundColor(.yellow)
+                            
+                            Text("OR")
+                                .font(.system(size: 8))
+                                .foregroundColor(.gray)
+                            
+                            Text("Swipe up")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundColor(.yellow)
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 4)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color.black.opacity(0.8))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(Color.yellow, lineWidth: 0.5)
+                                )
+                        )
+                    }
+                    .padding(.top, 6)
                 } else {
-                    Text("Waiting to start test…")
+                    Text("Waiting to start next test…")
                         .font(.body)
                         .foregroundColor(.yellow)
-                        .padding(.top, 14)
+                        .padding(.top, 8)
                 }
-                if !motionManager.lastErrorMsg.isEmpty {
+                if !motionManager.lastErrorMsg.isEmpty && motionManager.currentTest != "App Closed" {
                     Text(motionManager.lastErrorMsg)
                         .foregroundColor(motionManager.lastErrorMsg.contains("successfully") ? .green : .red)
                         .multilineTextAlignment(.center)
                         .padding(.top, 10)
+                        .font(.caption)
+                        .padding(.horizontal, 4)
                 }
-                Spacer()
+                Spacer(minLength: 8)
             }
         }
         .onAppear { motionManager.activateSession() }
