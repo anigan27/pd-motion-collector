@@ -1,7 +1,8 @@
-import Foundation
-import CoreMotion
-import WatchConnectivity
 import WatchKit
+import WatchConnectivity
+import CoreMotion
+import Foundation
+import HealthKit
 
 struct MotionSample: Codable {
     let timestamp: String
@@ -290,7 +291,7 @@ struct TestSession: Codable {
 }
 
 // MARK: - Original MotionManager with Enhanced Connection Integration
-class MotionManager: NSObject, ObservableObject, WCSessionDelegate {
+@objc class MotionManager: NSObject, ObservableObject, WCSessionDelegate {
     private let motion = CMMotionManager()
     private let queue = OperationQueue()
     @Published var samples = [MotionSample]()
@@ -305,6 +306,11 @@ class MotionManager: NSObject, ObservableObject, WCSessionDelegate {
     @Published var connectionManager = EnhancedConnectionManager()
     private var powerManager = PowerManager()
     private var activeTestSession: TestSession?
+    
+    // HealthKit properties
+    private let healthStore = HKHealthStore()
+    private var workoutSession: HKWorkoutSession?
+    private var workoutBuilder: HKLiveWorkoutBuilder?
     
     // Legacy properties for compatibility (simplified)
     private var keepAliveTimer: Timer?
@@ -524,16 +530,16 @@ class MotionManager: NSObject, ObservableObject, WCSessionDelegate {
     
     func startTestSession() {
         isSessionActive = true
-        // Watch is already kept awake globally
         startKeepAlive()
-        print("[DEBUG] Test session started - persistent wake state active")
+        print("[DEBUG] Test session started - workout processing mode active")
+        startWorkoutSession()
     }
     
     func endTestSession() {
         isSessionActive = false
         stopKeepAlive()
-        // Keep watch awake even after test session ends
-        print("[DEBUG] Test session ended - maintaining wake state")
+        endWorkoutSession()
+        print("[DEBUG] Test session ended - workout processing mode ended")
     }
     
     func closeWatchApp() {
@@ -578,15 +584,12 @@ class MotionManager: NSObject, ObservableObject, WCSessionDelegate {
         // Update UI to show app is closed and provide user guidance
         DispatchQueue.main.async {
             self.currentTest = "App Closed"
-            self.lastErrorMsg = "Press Digital Crown twice or swipe up to exit"
+            self.lastErrorMsg = "Press Digital Crown twice to exit"
             self.isSessionActive = false
             self.isCollecting = false
-            
-            // Play notification to get user attention
             WKInterfaceDevice.current().play(.notification)
-            
             print("[DEBUG] Watch app cleanup complete. App is now in closed state.")
-            print("[DEBUG] User should manually exit by pressing Digital Crown twice or swiping up from bottom.")
+            print("[DEBUG] User should manually exit by pressing Digital Crown twice.")
         }
     }
     
@@ -836,5 +839,64 @@ class MotionManager: NSObject, ObservableObject, WCSessionDelegate {
                 saveCurrentSession()
             }
         }
+    }
+    
+    // MARK: - Workout Session Management
+    
+    private func startWorkoutSession() {
+        guard HKHealthStore.isHealthDataAvailable() else {
+            print("[ERROR] Health data not available on this device.")
+            return
+        }
+        let configuration = HKWorkoutConfiguration()
+        configuration.activityType = .other
+        configuration.locationType = .unknown
+        do {
+            workoutSession = try HKWorkoutSession(healthStore: healthStore, configuration: configuration)
+            workoutBuilder = workoutSession?.associatedWorkoutBuilder()
+            workoutSession?.delegate = self
+            workoutBuilder?.delegate = self
+            workoutSession?.startActivity(with: Date())
+            print("[DEBUG] Workout session started")
+        } catch {
+            print("[ERROR] Failed to start workout session: \(error)")
+        }
+    }
+    private func endWorkoutSession() {
+        workoutSession?.end()
+        print("[DEBUG] Workout session ended")
+    }
+}
+
+extension MotionManager: HKWorkoutSessionDelegate, HKLiveWorkoutBuilderDelegate {
+    func workoutSession(_ workoutSession: HKWorkoutSession, didChangeTo toState: HKWorkoutSessionState, from fromState: HKWorkoutSessionState, date: Date) {
+        print("[DEBUG] Workout session state changed: \(toState.rawValue)")
+        if toState == .ended || toState == .stopped{
+            DispatchQueue.main.async {
+                self.lastErrorMsg = "Workout session ended or interrupted. Please restart the test."
+                WKInterfaceDevice.current().play(.notification)
+                self.isSessionActive = false
+                self.isCollecting = false
+                self.currentTest = "Session Ended"
+                
+            }
+            // Optionally, you could call self.startWorkoutSession() to auto-restart, but user action is safer.
+        }
+    }
+    func workoutSession(_ workoutSession: HKWorkoutSession, didFailWithError error: Error) {
+        print("[ERROR] Workout session failed: \(error)")
+        DispatchQueue.main.async {
+            self.lastErrorMsg = "Workout session error: \(error.localizedDescription). Please restart the test."
+            WKInterfaceDevice.current().play(.failure)
+            self.isSessionActive = false
+            self.isCollecting = false
+            self.currentTest = "Session Error"
+        }
+    }
+    func workoutBuilder(_ workoutBuilder: HKLiveWorkoutBuilder, didCollectDataOf collectedTypes: Set<HKSampleType>) {
+        // No-op for now
+    }
+    func workoutBuilderDidCollectEvent(_ workoutBuilder: HKLiveWorkoutBuilder) {
+        // No-op for now
     }
 }

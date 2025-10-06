@@ -693,7 +693,13 @@ struct ContentView: View {
                             .padding(.top, 10)
                             .padding(.bottom, 8)
                     } else {
-                        ForEach(filesMgr.files.filter { $0.lastPathComponent.lowercased() != "inbox" }.prefix(20), id: \ .self) { url in
+                        ForEach(filesMgr.files.filter { $0.lastPathComponent.lowercased() != "inbox" }
+                            .sorted { (a, b) in
+                                let aDate = (try? a.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? Date.distantPast
+                                let bDate = (try? b.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? Date.distantPast
+                                return aDate > bDate
+                            }
+                            .prefix(20), id: \ .self) { url in
                             HStack(spacing: 16) {
                                 Text(url.lastPathComponent)
                                     .font(.callout)

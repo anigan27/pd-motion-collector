@@ -169,12 +169,31 @@ This implementation addresses all the original issues while maintaining the core
 - **Auto-scroll State**: Proper handling of test index changes and view lifecycle
 - **Layout Optimization**: Efficient use of available screen space
 
+### Watch App - Stable Connection Implementation (September 28, 2025)
+
+- **Added WKExtendedRuntimeSession support in MotionManager.swift**
+  - Declared `private var extendedSession: WKExtendedRuntimeSession?`
+  - Started session in `startTestSession()` before running tests
+  - Ended session in `endTestSession()` and `closeWatchApp()`
+  - Implemented `WKExtendedRuntimeSessionDelegate` methods for lifecycle management:
+    - `extendedRuntimeSessionDidStart(_:)`
+    - `extendedRuntimeSessionWillExpire(_:)`
+    - `extendedRuntimeSessionDidInvalidate(_:)`
+  - Session keeps the app alive for up to 30 minutes, preventing sleep/disconnection during tests
+  - All changes are compatible with Apple Watch Series 10 and WatchOS 10+
+
+- **Result:**
+  - Watch app remains active and maintains a stable connection with iPhone during test sessions
+  - Session is started prior to running tests and ended when tests are complete or app is closed
+  - No changes required on iPhone side for session management
+
 ### Files Modified
 - `/Watch App for Motion Data Collection Watch App/ContentView.swift`
   - Compact app closure UI
   - Updated waiting message text
 - `/Watch App for Motion Data Collection Watch App/MotionManager.swift` 
   - Restored success message with 2-second auto-hide timer
+  - Added WKExtendedRuntimeSession support for stable connections
 - `/Motion Collector/ContentView.swift`
   - Removed individual file action buttons
   - Optimized file display layout
