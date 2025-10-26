@@ -214,8 +214,7 @@ struct ContentView: View {
             Alert(title: Text("Transfer"), message: Text(msg.message), dismissButton: .default(Text("OK")))
         }
         .confirmationDialog("Restart Session?", isPresented: $showRestartConfirm) {
-            Button("Delete session files and restart", role: .destructive) {
-                filesMgr.deleteSessionFiles(sessionFileList: state.filesForSession)
+            Button("Restart Session") {
                 restartSession()
                 showWelcome = true
             }
