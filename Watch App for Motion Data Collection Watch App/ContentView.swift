@@ -295,7 +295,7 @@ struct ContentView: View {
                     }
                     .padding(.top, 6)
                 } else {
-                    Text("Waiting to start next test…")
+                    Text("Waiting for next test…")
                         .font(.body)
                         .foregroundColor(.yellow)
                         .padding(.top, 8)
