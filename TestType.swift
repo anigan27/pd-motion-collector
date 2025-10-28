@@ -68,7 +68,7 @@ enum TestType: String, CaseIterable, Identifiable {
     }
     var instructions: String {
         switch self {
-        case .Tap: return "Extend the arm with the watch straight out in front of you. Tap your index finger and thumb together in a pinching motion. Repeat this motion as fast as you can for 10 seconds."
+        case .Tap: return "Extend the arm with the watch straight out in front of you. Tap your index finger and and thumb together in a pinching motion. Repeat this motion as fast as you can for 10 seconds."
         case .Fist: return "Extend the arm with the watch straight out in front of you. Close your hand tightly, making a fist. Open your hand and spread your fingers out as wide as you can. Repeat this opening and closing motion as fast as you can for 10 seconds."
         case .Pronate: return "Extend the arm with the watch straight out in front of you with your palm facing down. Rotate your forearm so that your palm is now facing the ceiling. Rotate your forearm in the opposite direction so that your palm is facing down again. Repeat the twisting motion as fast as you can for 10 seconds."
         case .Walk: return "Find a long, clear, straight path such as corridor. Walk in a straight line with natural arm swings for 10 seconds."

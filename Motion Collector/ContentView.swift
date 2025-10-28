@@ -76,7 +76,7 @@ struct ContentView: View {
                         if showWelcome {
                             WelcomeScreen(showWelcome: $showWelcome)
                                 .frame(maxWidth: 440)
-                                .padding(.top, 12)
+                                .padding(.top, 2)
                         }
                         if !showWelcome {
                             // Connection status indicator
@@ -319,21 +319,66 @@ struct ContentView: View {
     struct WelcomeScreen: View {
         @Binding var showWelcome: Bool
         var body: some View {
-            VStack(spacing: 38) {
-                Spacer()
+            VStack(spacing: 15) {
+                Spacer().frame(height: 10) // Minimal top spacer
                 Image("Pd-icon") // Custom image from Assets.xcassets
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: 256, height: 256)
-                Text("Welcome to Motion Collector")
-                    .font(.system(size: 34, weight: .heavy))
+                    .frame(width: 220, height: 220) // Slightly smaller than original
+                Text("Welcome to ParkinSpot")
+                    .font(.system(size: 30, weight: .heavy)) // Slightly smaller font
                     .foregroundColor(.accentColor)
                     .multilineTextAlignment(.center)
-                Text("You'll be guided step by step. Every test auto-saves and appears under 'Your Results'.")
-                    .font(.title3)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
+                    .padding(.horizontal, 20) // Add horizontal padding
+                
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Before beginning the tests:")
+                        .font(.title3)
+                        .foregroundColor(.primary)
+                        .fontWeight(.medium)
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(alignment: .top, spacing: 8) {
+                            Text("•")
+                                .font(.title3)
+                                .foregroundColor(.accentColor)
+                            Text("Wear the watch on your dominant hand")
+                                .font(.body) // Slightly smaller font
+                                .foregroundColor(.primary)
+                        }
+                        
+                        HStack(alignment: .top, spacing: 8) {
+                            Text("•")
+                                .font(.title3)
+                                .foregroundColor(.accentColor)
+                            Text("Grab an empty plastic bottle, a button-down shirt, and a piece of printer paper")
+                                .font(.body) // Slightly smaller font
+                                .foregroundColor(.primary)
+                        }
+                        
+                        HStack(alignment: .top, spacing: 8) {
+                            Text("•")
+                                .font(.title3)
+                                .foregroundColor(.accentColor)
+                            Text("You'll be guided step by step")
+                                .font(.body) // Slightly smaller font
+                                .foregroundColor(.primary)
+                        }
+                        
+                        HStack(alignment: .top, spacing: 8) {
+                            Text("•")
+                                .font(.title3)
+                                .foregroundColor(.accentColor)
+                            Text("Every test auto-saves and appears under 'Your Results'")
+                                .font(.body) // Slightly smaller font
+                                .foregroundColor(.primary)
+                        }
+                    }
+                }
+                .padding(.horizontal, 32)
+                
+                Spacer().frame(height: 15) // Controlled spacing before button
+                
                 Button(action: { showWelcome = false }) {
                     Text("Get Started")
                         .font(.title2.bold())
@@ -342,7 +387,8 @@ struct ContentView: View {
                         .background(Capsule().fill(Color.accentColor))
                         .foregroundColor(.white)
                 }
-                Spacer()
+                
+                Spacer().frame(height: 20) // Small bottom spacer
             }
             .background(Color(.systemBackground).edgesIgnoringSafeArea(.all))
         }
