@@ -492,12 +492,6 @@ struct ContentView: View {
                     Image(systemName:"checkmark.circle.fill")
                         .font(.title2).foregroundColor(.green)
                 }
-                Text(test.instructions)
-                    .font(.body)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(nil)
-                    .fixedSize(horizontal: false, vertical: true)
                 Button(action: onStart) {
                     Text(isComplete ? "Redo Test" : "Begin Test")
                         .font(.body.bold())
@@ -522,17 +516,43 @@ struct ContentView: View {
         let onBegin: () -> Void
         let sendWatchTestCommand: (String, TestType) -> Void
         var isTimed: Bool { ContentView.timedTests.contains(test) }
+        
+        var instructionBullets: [String] {
+            ContentView.formatInstructionsAsBullets(test.instructions)
+        }
+        
         var body: some View {
-            VStack(spacing:29) {
-                Spacer()
+            VStack(spacing:24) {
+                Spacer().frame(height: 20)
                 Text("How to do this test").font(.title2.bold()).foregroundColor(.accentColor).multilineTextAlignment(.center)
                 Image(systemName:"questionmark.circle.fill").font(.system(size:58)).foregroundColor(.blue)
-                Text(test.instructions)
-                    .font(.title3)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(nil)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal,22)
+                
+                // Instructions as bulleted list
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Instructions:")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                        .padding(.bottom, 4)
+                    
+                    ForEach(instructionBullets, id: \.self) { bullet in
+                        HStack(alignment: .top, spacing: 8) {
+                            Text("•")
+                                .font(.body)
+                                .foregroundColor(.accentColor)
+                                .padding(.top, 1)
+                            Text(bullet)
+                                .font(.body)
+                                .foregroundColor(.primary)
+                                .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemGray6)))
+                .padding(.horizontal, 22)
+                
                 Button("Begin Test") {
                     if isTimed {
                         sendWatchTestCommand("start", test) // Only send 'start' for timed tests
@@ -607,6 +627,7 @@ struct ContentView: View {
             }
             return 0
         }
+        
         var body: some View {
             VStack(spacing:37){
                 Spacer()
@@ -998,6 +1019,28 @@ struct ContentView: View {
             }
         } catch {}
         return "--"
+    }
+    
+    static func formatInstructionsAsBullets(_ instructions: String) -> [String] {
+        // Split instructions into sentences and create bullet points
+        let sentences = instructions.components(separatedBy: ". ")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        
+        var bullets: [String] = []
+        
+        for (index, sentence) in sentences.enumerated() {
+            var formattedSentence = sentence
+            
+            // Add period if it's not the last sentence and doesn't already end with punctuation
+            if index < sentences.count - 1 && !sentence.hasSuffix(".") && !sentence.hasSuffix("!") && !sentence.hasSuffix("?") {
+                formattedSentence += "."
+            }
+            
+            bullets.append(formattedSentence)
+        }
+        
+        return bullets
     }
 
 
