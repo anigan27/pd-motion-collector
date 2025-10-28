@@ -71,100 +71,107 @@ struct ContentView: View {
         NavigationView {
             ZStack {
                 Color(.systemGroupedBackground).ignoresSafeArea()
-                ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: 36) {
-                        if showWelcome {
-                            WelcomeScreen(showWelcome: $showWelcome)
-                                .frame(maxWidth: 440)
-                                .padding(.top, 2)
-                        }
-                        if !showWelcome {
-                            // Connection status indicator
-                            ConnectionStatusView(
-                                isConnected: connectionManager.isConnected,
-                                connectionQuality: connectionManager.connectionQuality
-                            )
-                                .padding(.horizontal, 20)
-                                .padding(.bottom, 10)
-                            
-                            if isSessionComplete {
-                                SessionCompleteScreen(
-                                    onRestart: { showRestartConfirm = true },
+                VStack(spacing: 0) {
+                    // Fixed connection status at top (only when not showing welcome)
+                    if !showWelcome {
+                        ConnectionStatusView(
+                            isConnected: connectionManager.isConnected,
+                            connectionQuality: connectionManager.connectionQuality
+                        )
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(Color(.systemGroupedBackground))
+                    }
+                    
+                    // Scrollable content
+                    ScrollView(.vertical, showsIndicators: false) {
+                        VStack(spacing: 36) {
+                            if showWelcome {
+                                WelcomeScreen(showWelcome: $showWelcome)
+                                    .frame(maxWidth: 440)
+                                    .padding(.top, 2)
+                            }
+                            if !showWelcome {
+                                if isSessionComplete {
+                                    SessionCompleteScreen(
+                                        onRestart: { showRestartConfirm = true },
+                                        uploadAllCSVFiles: uploadAllCSVFiles,
+                                        closeWatchApp: closeWatchApp,
+                                        filesMgr: filesMgr,
+                                        resultsActionAlert: $resultsActionAlert
+                                    )
+                                        .frame(maxWidth: 420)
+                                        .padding(.vertical, 8)
+                                } else if state.step == 1 {
+                                    MainTestCards(
+                                        state: state,
+                                        timedTests: timedTests,
+                                        untimedTests: untimedTests,
+                                        nextTestIndex: nextTestIndex,
+                                        testIsComplete: testIsComplete,
+                                        sendWatchTestCommand: sendWatchTestCommand
+                                    )
+                                    .frame(maxWidth: 440)
+                                    .padding(.vertical, 8)
+                                } else if state.step == 2, let test = curTest {
+                                    HowToScreen(
+                                        test: test,
+                                        onBegin: { state.step = 3 },
+                                        onBack: { state.step = 1 },
+                                        sendWatchTestCommand: sendWatchTestCommand
+                                    )
+                                    .frame(maxWidth: 420)
+                                    .padding(.top, 8)
+                                } else if state.step == 3, let test = curTest {
+                                    if isTimedTest {
+                                        TimedCollectScreen(
+                                            test: test,
+                                            onDone: { state.markComplete(state.idx); state.step = 4 },
+                                            sendWatchTestCommand: sendWatchTestCommand
+                                        )
+                                        .frame(maxWidth: 420)
+                                        .padding(.top, 8)
+                                    } else {
+                                        UntimedCollectScreen(
+                                            test: test,
+                                            onDone: { state.markComplete(state.idx); state.step = 4 },
+                                            sendWatchTestCommand: sendWatchTestCommand
+                                        )
+                                        .frame(maxWidth: 420)
+                                        .padding(.top, 8)
+                                    }
+                                } else if state.step == 4, let test = curTest {
+                                    DoneTestScreen(
+                                        test: test, 
+                                        onNext: {
+                                            // Always go back to test selection if there are incomplete tests
+                                            if state.completedTests.count < allTests.count {
+                                                state.step = 1 // Go back to test selection screen
+                                            }
+                                            // If all tests are complete, stay on completion screen (step 4)
+                                        },
+                                        remainingTests: allTests.count - state.completedTests.count
+                                    )
+                                    .frame(maxWidth: 420)
+                                    .padding(.top, 9)
+                                }
+                                HandheldResultsDropdown(
+                                    filesMgr: filesMgr,
+                                    showResults: $showResults,
+                                    fileToPreview: $fileToPreview,
+                                    showFilePreview: $showFilePreview, // <-- Pass the binding here
+                                    fileToShare: $fileToShare,
+                                    showFileShare: $showFileShare,
+                                    fileToDelete: $fileToDelete,
+                                    sendFileResult: $sendFileResult,
+                                    resultsActionAlert: $resultsActionAlert,
                                     uploadAllCSVFiles: uploadAllCSVFiles,
                                     closeWatchApp: closeWatchApp,
-                                    filesMgr: filesMgr,
-                                    resultsActionAlert: $resultsActionAlert
-                                )
-                                    .frame(maxWidth: 420)
-                                    .padding(.vertical, 8)
-                            } else if state.step == 1 {
-                                MainTestCards(
-                                    state: state,
-                                    timedTests: timedTests,
-                                    untimedTests: untimedTests,
-                                    nextTestIndex: nextTestIndex,
-                                    testIsComplete: testIsComplete,
-                                    sendWatchTestCommand: sendWatchTestCommand
+                                    isSessionComplete: isSessionComplete
                                 )
                                 .frame(maxWidth: 440)
-                                .padding(.vertical, 8)
-                            } else if state.step == 2, let test = curTest {
-                                HowToScreen(
-                                    test: test,
-                                    onBegin: { state.step = 3 },
-                                    sendWatchTestCommand: sendWatchTestCommand
-                                )
-                                .frame(maxWidth: 420)
-                                .padding(.top, 8)
-                            } else if state.step == 3, let test = curTest {
-                                if isTimedTest {
-                                    TimedCollectScreen(
-                                        test: test,
-                                        onDone: { state.markComplete(state.idx); state.step = 4 },
-                                        sendWatchTestCommand: sendWatchTestCommand
-                                    )
-                                    .frame(maxWidth: 420)
-                                    .padding(.top, 8)
-                                } else {
-                                    UntimedCollectScreen(
-                                        test: test,
-                                        onDone: { state.markComplete(state.idx); state.step = 4 },
-                                        sendWatchTestCommand: sendWatchTestCommand
-                                    )
-                                    .frame(maxWidth: 420)
-                                    .padding(.top, 8)
-                                }
-                            } else if state.step == 4, let test = curTest {
-                                DoneTestScreen(
-                                    test: test, 
-                                    onNext: {
-                                        // Always go back to test selection if there are incomplete tests
-                                        if state.completedTests.count < allTests.count {
-                                            state.step = 1 // Go back to test selection screen
-                                        }
-                                        // If all tests are complete, stay on completion screen (step 4)
-                                    },
-                                    remainingTests: allTests.count - state.completedTests.count
-                                )
-                                .frame(maxWidth: 420)
-                                .padding(.top, 9)
+                                .padding(.bottom, 22)
                             }
-                            HandheldResultsDropdown(
-                                filesMgr: filesMgr,
-                                showResults: $showResults,
-                                fileToPreview: $fileToPreview,
-                                showFilePreview: $showFilePreview, // <-- Pass the binding here
-                                fileToShare: $fileToShare,
-                                showFileShare: $showFileShare,
-                                fileToDelete: $fileToDelete,
-                                sendFileResult: $sendFileResult,
-                                resultsActionAlert: $resultsActionAlert,
-                                uploadAllCSVFiles: uploadAllCSVFiles,
-                                closeWatchApp: closeWatchApp,
-                                isSessionComplete: isSessionComplete
-                            )
-                            .frame(maxWidth: 440)
-                            .padding(.bottom, 22)
                         }
                     }
                 }
@@ -514,6 +521,7 @@ struct ContentView: View {
     struct HowToScreen: View {
         let test: TestType
         let onBegin: () -> Void
+        let onBack: () -> Void
         let sendWatchTestCommand: (String, TestType) -> Void
         var isTimed: Bool { ContentView.timedTests.contains(test) }
         
@@ -523,9 +531,30 @@ struct ContentView: View {
         
         var body: some View {
             VStack(spacing:24) {
-                Spacer().frame(height: 20)
+                // Back button at the top
+                HStack {
+                    Button(action: onBack) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 16, weight: .semibold))
+                            Text("Back")
+                                .font(.body.weight(.medium))
+                        }
+                        .foregroundColor(.accentColor)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.accentColor.opacity(0.1))
+                        )
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, 22)
+                .padding(.top, 10)
+                
+                Spacer().frame(height: 10)
                 Text("How to do this test").font(.title2.bold()).foregroundColor(.accentColor).multilineTextAlignment(.center)
-                Image(systemName:"questionmark.circle.fill").font(.system(size:58)).foregroundColor(.blue)
                 
                 // Instructions as bulleted list
                 VStack(alignment: .leading, spacing: 8) {
