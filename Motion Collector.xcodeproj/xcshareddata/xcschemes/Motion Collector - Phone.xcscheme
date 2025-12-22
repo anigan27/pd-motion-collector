@@ -21,6 +21,20 @@
                ReferencedContainer = "container:Motion Collector.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "842076202DF0BDDB00A6D49E"
+               BuildableName = "Watch App for Motion Data Collection Watch App.app"
+               BlueprintName = "Watch App for Motion Data Collection Watch App"
+               ReferencedContainer = "container:Motion Collector.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction

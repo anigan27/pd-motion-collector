@@ -114,13 +114,37 @@ struct ContentView: View {
                                     .frame(maxWidth: 440)
                                     .padding(.vertical, 8)
                                 } else if state.step == 2, let test = curTest {
-                                    HowToScreen(
-                                        test: test,
-                                        onBegin: { state.step = 3 },
-                                        onBack: { state.step = 1 },
-                                        sendWatchTestCommand: sendWatchTestCommand
-                                    )
-                                    .frame(maxWidth: 420)
+                                    VStack(spacing: 0) {
+                                        HowToScreen(
+                                            test: test,
+                                            onBegin: { state.step = 3 },
+                                            onBack: { state.step = 1 },
+                                            sendWatchTestCommand: sendWatchTestCommand
+                                        )
+                                        .frame(maxWidth: 420)
+                                        
+                                        // Add space between content and Your Results
+                                        Spacer()
+                                            .frame(height: 30)
+                                        
+                                        // Your Results at bottom of HowToScreen
+                                        HandheldResultsDropdown(
+                                            filesMgr: filesMgr,
+                                            showResults: $showResults,
+                                            fileToPreview: $fileToPreview,
+                                            showFilePreview: $showFilePreview,
+                                            fileToShare: $fileToShare,
+                                            showFileShare: $showFileShare,
+                                            fileToDelete: $fileToDelete,
+                                            sendFileResult: $sendFileResult,
+                                            resultsActionAlert: $resultsActionAlert,
+                                            uploadAllCSVFiles: uploadAllCSVFiles,
+                                            closeWatchApp: closeWatchApp,
+                                            isSessionComplete: isSessionComplete
+                                        )
+                                        .frame(maxWidth: 420)
+                                        .padding(.bottom, 20)
+                                    }
                                     .padding(.top, 8)
                                 } else if state.step == 3, let test = curTest {
                                     if isTimedTest {
@@ -155,22 +179,26 @@ struct ContentView: View {
                                     .frame(maxWidth: 420)
                                     .padding(.top, 9)
                                 }
-                                HandheldResultsDropdown(
-                                    filesMgr: filesMgr,
-                                    showResults: $showResults,
-                                    fileToPreview: $fileToPreview,
-                                    showFilePreview: $showFilePreview, // <-- Pass the binding here
-                                    fileToShare: $fileToShare,
-                                    showFileShare: $showFileShare,
-                                    fileToDelete: $fileToDelete,
-                                    sendFileResult: $sendFileResult,
-                                    resultsActionAlert: $resultsActionAlert,
-                                    uploadAllCSVFiles: uploadAllCSVFiles,
-                                    closeWatchApp: closeWatchApp,
-                                    isSessionComplete: isSessionComplete
-                                )
-                                .frame(maxWidth: 440)
-                                .padding(.bottom, 22)
+                                
+                                // Show HandheldResultsDropdown only when NOT on step 2 (HowToScreen)
+                                if state.step != 2 {
+                                    HandheldResultsDropdown(
+                                        filesMgr: filesMgr,
+                                        showResults: $showResults,
+                                        fileToPreview: $fileToPreview,
+                                        showFilePreview: $showFilePreview,
+                                        fileToShare: $fileToShare,
+                                        showFileShare: $showFileShare,
+                                        fileToDelete: $fileToDelete,
+                                        sendFileResult: $sendFileResult,
+                                        resultsActionAlert: $resultsActionAlert,
+                                        uploadAllCSVFiles: uploadAllCSVFiles,
+                                        closeWatchApp: closeWatchApp,
+                                        isSessionComplete: isSessionComplete
+                                    )
+                                    .frame(maxWidth: 440)
+                                    .padding(.bottom, 22)
+                                }
                             }
                         }
                     }
@@ -485,10 +513,14 @@ struct ContentView: View {
         }
         var body: some View {
             VStack(spacing: 12) {
-                Image(systemName:"rectangle.and.pencil.and.ellipsis")
-                    .font(.system(size:42))
+                // Activity image
+                Image(ContentView.imageNameForTest(test))
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 60, height: 60)
                     .foregroundColor(selected ? .accentColor : (isComplete ? .green : .blue))
                     .padding(.top,6)
+                
                 Text("Test \(testNumber): \(test.rawValue)")
                     .font(.title3.weight(selected ? .bold : .regular))
                     .foregroundColor(isComplete ? .green : .accentColor)
@@ -530,69 +562,92 @@ struct ContentView: View {
         }
         
         var body: some View {
-            VStack(spacing:24) {
-                // Back button at the top
-                HStack {
-                    Button(action: onBack) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "chevron.left")
-                                .font(.system(size: 16, weight: .semibold))
-                            Text("Back")
-                                .font(.body.weight(.medium))
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 20) {
+                    // Back button at the top
+                    HStack {
+                        Button(action: onBack) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "chevron.left")
+                                    .font(.system(size: 16, weight: .semibold))
+                                Text("Back")
+                                    .font(.body.weight(.medium))
+                            }
+                            .foregroundColor(.accentColor)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.accentColor.opacity(0.1))
+                            )
                         }
-                        .foregroundColor(.accentColor)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.accentColor.opacity(0.1))
-                        )
+                        Spacer()
                     }
-                    Spacer()
-                }
-                .padding(.horizontal, 22)
-                .padding(.top, 10)
-                
-                Spacer().frame(height: 10)
-                Text("How to do this test").font(.title2.bold()).foregroundColor(.accentColor).multilineTextAlignment(.center)
-                
-                // Instructions as bulleted list
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Instructions:")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                        .padding(.bottom, 4)
+                    .padding(.horizontal, 22)
+                    .padding(.top, 10)
                     
-                    ForEach(instructionBullets, id: \.self) { bullet in
-                        HStack(alignment: .top, spacing: 8) {
-                            Text("•")
-                                .font(.body)
-                                .foregroundColor(.accentColor)
-                                .padding(.top, 1)
-                            Text(bullet)
-                                .font(.body)
-                                .foregroundColor(.primary)
-                                .multilineTextAlignment(.leading)
-                                .fixedSize(horizontal: false, vertical: true)
+                    // Title moved up
+                    Text("How to do this test")
+                        .font(.title2.bold())
+                        .foregroundColor(.accentColor)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 5)
+                    
+                    // Activity image in the center (where instructions used to be)
+                    Image(ContentView.imageNameForTest(test))
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 180, height: 180)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.accentColor.opacity(0.3), lineWidth: 2)
+                        )
+                        .padding(.horizontal, 22)
+                    
+                    // Begin Test button
+                    Button("Begin Test") {
+                        if isTimed {
+                            sendWatchTestCommand("start", test)
+                        }
+                        onBegin()
+                    }
+                    .font(.title3.bold())
+                    .padding(.horizontal, 40)
+                    .padding(.vertical, 14)
+                    .background(Capsule().fill(Color.accentColor))
+                    .foregroundColor(.white)
+                    
+                    // Instructions moved below the button with better spacing
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Instructions:")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                            .padding(.bottom, 4)
+                        
+                        ForEach(instructionBullets, id: \.self) { bullet in
+                            HStack(alignment: .top, spacing: 8) {
+                                Text("•")
+                                    .font(.body)
+                                    .foregroundColor(.accentColor)
+                                    .padding(.top, 1)
+                                Text(bullet)
+                                    .font(.body)
+                                    .foregroundColor(.primary)
+                                    .multilineTextAlignment(.leading)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
                         }
                     }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 16)
+                    .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemGray6)))
+                    .padding(.horizontal, 22)
+                    
+                    // Extra space before bottom content
+                    Spacer()
+                        .frame(height: 40)
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemGray6)))
-                .padding(.horizontal, 22)
-                
-                Button("Begin Test") {
-                    if isTimed {
-                        sendWatchTestCommand("start", test) // Only send 'start' for timed tests
-                    }
-                    onBegin()
-                }
-                .font(.title3.bold())
-                .padding(.horizontal, 40).padding(.vertical, 14)
-                .background(Capsule().fill(Color.accentColor))
-                .foregroundColor(.white)
-                Spacer()
             }
             .background(Color(.systemBackground).edgesIgnoringSafeArea(.all))
         }
@@ -617,7 +672,14 @@ struct ContentView: View {
             VStack(spacing:33) {
                 Spacer()
                 Text("Collecting Data").font(.title.bold()).foregroundColor(.accentColor)
-                Image(systemName:"clock.arrow.circlepath").font(.system(size:66)).foregroundColor(.accentColor)
+                
+                // Activity image
+                Image(ContentView.imageNameForTest(test))
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 80, height: 80)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                
                 Text("Test \(testNumber): \(test.rawValue)").font(.title2.bold()).foregroundColor(.accentColor)
                 Text("Time left: \(timeLeft)s").font(.largeTitle.bold())
                 ProgressView(value:Double(10-timeLeft),total:10).progressViewStyle(LinearProgressViewStyle(tint:.accentColor)).scaleEffect(y:1.3).padding(.horizontal,60)
@@ -661,7 +723,14 @@ struct ContentView: View {
             VStack(spacing:37){
                 Spacer()
                 Text("Manual Data Collection").font(.title.bold()).foregroundColor(.accentColor)
-                Image(systemName:"stopwatch.fill").font(.system(size:64)).foregroundColor(.accentColor)
+                
+                // Activity image
+                Image(ContentView.imageNameForTest(test))
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 80, height: 80)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                
                 Text("Test \(testNumber): \(test.rawValue)").font(.title2.bold()).foregroundColor(.accentColor)
                 Text(collecting ? "Press Stop when ready!" : "Press Start to begin").font(.body).foregroundColor(.secondary).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
                 Spacer()
@@ -1071,8 +1140,23 @@ struct ContentView: View {
         
         return bullets
     }
-
-
+    
+    // Helper function to get image name for each test type
+    static func imageNameForTest(_ test: TestType) -> String {
+        switch test {
+        case .Tap: return "fingertapping"
+        case .Fist: return "fistopenclose"
+        case .Pronate: return "wristPandS"
+        case .Walk: return "walk"
+        case .Knees: return "handsonknees"
+        case .Toe: return "toetapping"
+        case .Nose: return "fingertonose"
+        case .StartStop: return "walkstartstop"
+        case .Bottle: return "bottlecap"
+        case .Button: return "buttonunbutton"
+        case .Paper: return "paperfold"
+        }
+    }
 } // End of ContentView struct
 
 class GoogleCloudUploader {
