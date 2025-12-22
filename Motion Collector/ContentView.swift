@@ -47,6 +47,7 @@ struct ContentView: View {
     @State private var tablePreviewTitle: String = ""
     @State private var csvPreviewHeaders: [String] = []
     @State private var csvPreviewRows: [[String]] = []
+    @State private var showSplash: Bool = true
     @State private var showWelcome: Bool = true
     @State private var showResults: Bool = false
     @State private var resultsActionAlert: ResultsActionAlert? = nil
@@ -71,63 +72,123 @@ struct ContentView: View {
         NavigationView {
             ZStack {
                 Color(.systemGroupedBackground).ignoresSafeArea()
-                VStack(spacing: 0) {
-                    // Fixed connection status at top (only when not showing welcome)
-                    if !showWelcome {
-                        ConnectionStatusView(
-                            isConnected: connectionManager.isConnected,
-                            connectionQuality: connectionManager.connectionQuality
-                        )
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 10)
-                        .background(Color(.systemGroupedBackground))
-                    }
-                    
-                    // Scrollable content
-                    ScrollView(.vertical, showsIndicators: false) {
-                        VStack(spacing: 36) {
-                            if showWelcome {
-                                WelcomeScreen(showWelcome: $showWelcome)
-                                    .frame(maxWidth: 440)
-                                    .padding(.top, 2)
-                            }
-                            if !showWelcome {
-                                if isSessionComplete {
-                                    SessionCompleteScreen(
-                                        onRestart: { showRestartConfirm = true },
-                                        uploadAllCSVFiles: uploadAllCSVFiles,
-                                        closeWatchApp: closeWatchApp,
-                                        filesMgr: filesMgr,
-                                        resultsActionAlert: $resultsActionAlert
-                                    )
-                                        .frame(maxWidth: 420)
-                                        .padding(.vertical, 8)
-                                } else if state.step == 1 {
-                                    MainTestCards(
-                                        state: state,
-                                        timedTests: timedTests,
-                                        untimedTests: untimedTests,
-                                        nextTestIndex: nextTestIndex,
-                                        testIsComplete: testIsComplete,
-                                        sendWatchTestCommand: sendWatchTestCommand
-                                    )
-                                    .frame(maxWidth: 440)
-                                    .padding(.vertical, 8)
-                                } else if state.step == 2, let test = curTest {
-                                    VStack(spacing: 0) {
-                                        HowToScreen(
-                                            test: test,
-                                            onBegin: { state.step = 3 },
-                                            onBack: { state.step = 1 },
+                
+                if showSplash {
+                    SplashScreen(showSplash: $showSplash)
+                        .transition(.opacity)
+                        .zIndex(1) // Ensure it sits on top during transition
+                } else {
+                    VStack(spacing: 0) {
+                        // Fixed connection status at top (only when not showing welcome)
+                        if !showWelcome {
+                            ConnectionStatusView(
+                                isConnected: connectionManager.isConnected,
+                                connectionQuality: connectionManager.connectionQuality
+                            )
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(Color(.systemGroupedBackground))
+                        }
+                        
+                        // Scrollable content
+                        ScrollView(.vertical, showsIndicators: false) {
+                            VStack(spacing: 36) {
+                                if showWelcome {
+                                    WelcomeScreen(showWelcome: $showWelcome)
+                                        .frame(maxWidth: 440)
+                                        .padding(.top, 2)
+                                }
+                                if !showWelcome {
+                                    if isSessionComplete {
+                                        SessionCompleteScreen(
+                                            onRestart: { showRestartConfirm = true },
+                                            uploadAllCSVFiles: uploadAllCSVFiles,
+                                            closeWatchApp: closeWatchApp,
+                                            filesMgr: filesMgr,
+                                            resultsActionAlert: $resultsActionAlert
+                                        )
+                                            .frame(maxWidth: 420)
+                                            .padding(.vertical, 8)
+                                    } else if state.step == 1 {
+                                        MainTestCards(
+                                            state: state,
+                                            timedTests: timedTests,
+                                            untimedTests: untimedTests,
+                                            nextTestIndex: nextTestIndex,
+                                            testIsComplete: testIsComplete,
                                             sendWatchTestCommand: sendWatchTestCommand
                                         )
+                                        .frame(maxWidth: 440)
+                                        .padding(.vertical, 8)
+                                    } else if state.step == 2, let test = curTest {
+                                        VStack(spacing: 0) {
+                                            HowToScreen(
+                                                test: test,
+                                                onBegin: { state.step = 3 },
+                                                onBack: { state.step = 1 },
+                                                sendWatchTestCommand: sendWatchTestCommand
+                                            )
+                                            .frame(maxWidth: 420)
+                                            
+                                            // Add space between content and Your Results
+                                            Spacer()
+                                                .frame(height: 30)
+                                            
+                                            // Your Results at bottom of HowToScreen
+                                            HandheldResultsDropdown(
+                                                filesMgr: filesMgr,
+                                                showResults: $showResults,
+                                                fileToPreview: $fileToPreview,
+                                                showFilePreview: $showFilePreview,
+                                                fileToShare: $fileToShare,
+                                                showFileShare: $showFileShare,
+                                                fileToDelete: $fileToDelete,
+                                                sendFileResult: $sendFileResult,
+                                                resultsActionAlert: $resultsActionAlert,
+                                                uploadAllCSVFiles: uploadAllCSVFiles,
+                                                closeWatchApp: closeWatchApp,
+                                                isSessionComplete: isSessionComplete
+                                            )
+                                            .frame(maxWidth: 420)
+                                            .padding(.bottom, 20)
+                                        }
+                                        .padding(.top, 8)
+                                    } else if state.step == 3, let test = curTest {
+                                        if isTimedTest {
+                                            TimedCollectScreen(
+                                                test: test,
+                                                onDone: { state.markComplete(state.idx); state.step = 4 },
+                                                sendWatchTestCommand: sendWatchTestCommand
+                                            )
+                                            .frame(maxWidth: 420)
+                                            .padding(.top, 8)
+                                        } else {
+                                            UntimedCollectScreen(
+                                                test: test,
+                                                onDone: { state.markComplete(state.idx); state.step = 4 },
+                                                sendWatchTestCommand: sendWatchTestCommand
+                                            )
+                                            .frame(maxWidth: 420)
+                                            .padding(.top, 8)
+                                        }
+                                    } else if state.step == 4, let test = curTest {
+                                        DoneTestScreen(
+                                            test: test, 
+                                            onNext: {
+                                                // Always go back to test selection if there are incomplete tests
+                                                if state.completedTests.count < allTests.count {
+                                                    state.step = 1 // Go back to test selection screen
+                                                }
+                                                // If all tests are complete, stay on completion screen (step 4)
+                                            },
+                                            remainingTests: allTests.count - state.completedTests.count
+                                        )
                                         .frame(maxWidth: 420)
-                                        
-                                        // Add space between content and Your Results
-                                        Spacer()
-                                            .frame(height: 30)
-                                        
-                                        // Your Results at bottom of HowToScreen
+                                        .padding(.top, 9)
+                                    }
+                                    
+                                    // Show HandheldResultsDropdown only when NOT on step 2 (HowToScreen)
+                                    if state.step != 2 {
                                         HandheldResultsDropdown(
                                             filesMgr: filesMgr,
                                             showResults: $showResults,
@@ -142,66 +203,14 @@ struct ContentView: View {
                                             closeWatchApp: closeWatchApp,
                                             isSessionComplete: isSessionComplete
                                         )
-                                        .frame(maxWidth: 420)
-                                        .padding(.bottom, 20)
+                                        .frame(maxWidth: 440)
+                                        .padding(.bottom, 22)
                                     }
-                                    .padding(.top, 8)
-                                } else if state.step == 3, let test = curTest {
-                                    if isTimedTest {
-                                        TimedCollectScreen(
-                                            test: test,
-                                            onDone: { state.markComplete(state.idx); state.step = 4 },
-                                            sendWatchTestCommand: sendWatchTestCommand
-                                        )
-                                        .frame(maxWidth: 420)
-                                        .padding(.top, 8)
-                                    } else {
-                                        UntimedCollectScreen(
-                                            test: test,
-                                            onDone: { state.markComplete(state.idx); state.step = 4 },
-                                            sendWatchTestCommand: sendWatchTestCommand
-                                        )
-                                        .frame(maxWidth: 420)
-                                        .padding(.top, 8)
-                                    }
-                                } else if state.step == 4, let test = curTest {
-                                    DoneTestScreen(
-                                        test: test, 
-                                        onNext: {
-                                            // Always go back to test selection if there are incomplete tests
-                                            if state.completedTests.count < allTests.count {
-                                                state.step = 1 // Go back to test selection screen
-                                            }
-                                            // If all tests are complete, stay on completion screen (step 4)
-                                        },
-                                        remainingTests: allTests.count - state.completedTests.count
-                                    )
-                                    .frame(maxWidth: 420)
-                                    .padding(.top, 9)
-                                }
-                                
-                                // Show HandheldResultsDropdown only when NOT on step 2 (HowToScreen)
-                                if state.step != 2 {
-                                    HandheldResultsDropdown(
-                                        filesMgr: filesMgr,
-                                        showResults: $showResults,
-                                        fileToPreview: $fileToPreview,
-                                        showFilePreview: $showFilePreview,
-                                        fileToShare: $fileToShare,
-                                        showFileShare: $showFileShare,
-                                        fileToDelete: $fileToDelete,
-                                        sendFileResult: $sendFileResult,
-                                        resultsActionAlert: $resultsActionAlert,
-                                        uploadAllCSVFiles: uploadAllCSVFiles,
-                                        closeWatchApp: closeWatchApp,
-                                        isSessionComplete: isSessionComplete
-                                    )
-                                    .frame(maxWidth: 440)
-                                    .padding(.bottom, 22)
                                 }
                             }
                         }
                     }
+                    .transition(.opacity)
                 }
             }
             .navigationBarHidden(true)
@@ -350,6 +359,90 @@ struct ContentView: View {
         }
     }
     
+    
+    struct SplashScreen: View {
+        @Binding var showSplash: Bool
+        @State private var isConsented = false
+        
+        var body: some View {
+            ZStack {
+                Color(.systemBackground).ignoresSafeArea()
+                
+                VStack(spacing: 30) {
+                    Spacer()
+                    
+                    // Logo
+                    Image("Pd-icon")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 180, height: 180)
+                        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+                    
+                    Text("ParkinSpot")
+                        .font(.system(size: 36, weight: .heavy))
+                        .foregroundColor(.accentColor)
+                    
+                    Spacer().frame(height: 20)
+                    
+                    // Disclaimer Text
+                    VStack(spacing: 16) {
+                        Text("This app will be used to collect motion data across different activities for research purposes. No personally identifying information will be collected.")
+                            .font(.body)
+                            .multilineTextAlignment(.center)
+                            .foregroundColor(.primary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .lineSpacing(4)
+                    }
+                    .padding(.horizontal, 30)
+                    .padding(.vertical, 20)
+                    .padding(.horizontal, 20)
+                    
+                    Spacer()
+                    
+                    // Consent Checkbox
+                    Button(action: {
+                        withAnimation {
+                            isConsented.toggle()
+                        }
+                    }) {
+                        HStack(spacing: 12) {
+                            Image(systemName: isConsented ? "checkmark.square.fill" : "square")
+                                .font(.system(size: 24, weight: .medium))
+                                .foregroundColor(isConsented ? .accentColor : .secondary)
+                            
+                            Text("I consent")
+                                .font(.title3.weight(.medium))
+                                .foregroundColor(.primary)
+                        }
+                        .padding()
+                    }
+                    
+                    // Continue Button (only visible when consented)
+                    if isConsented {
+                        Button(action: {
+                            withAnimation {
+                                showSplash = false
+                            }
+                        }) {
+                            Text("Continue")
+                                .font(.title3.bold())
+                                .foregroundColor(.white)
+                                .frame(width: 200, height: 50)
+                                .background(Capsule().fill(Color.accentColor))
+                                .shadow(color: .accentColor.opacity(0.3), radius: 5, x: 0, y: 3)
+                        }
+                        .transition(.scale.combined(with: .opacity))
+                    } else {
+                        // Invisible placeholder to keep layout stable
+                        Color.clear
+                            .frame(width: 200, height: 50)
+                    }
+                    
+                    Spacer().frame(height: 50)
+                }
+            }
+        }
+    }
     
     struct WelcomeScreen: View {
         @Binding var showWelcome: Bool
@@ -1146,12 +1239,12 @@ struct ContentView: View {
         switch test {
         case .Tap: return "fingertapping"
         case .Fist: return "fistopenclose"
-        case .Pronate: return "wristPandS"
+        case .Pronate: return "wristpronate"
         case .Walk: return "walk"
         case .Knees: return "handsonknees"
         case .Toe: return "toetapping"
         case .Nose: return "fingertonose"
-        case .StartStop: return "walkstartstop"
+        case .StartStop: return "startstop"
         case .Bottle: return "bottlecap"
         case .Button: return "buttonunbutton"
         case .Paper: return "paperfold"
